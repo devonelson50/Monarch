@@ -1,0 +1,10 @@
+# Please refer https://aka.ms/HTTPSinContainer on how to setup an https developer certificate for your ASP.NET Core service.
+
+services:
+  monarch:
+    image: monarch
+    build:
+      context: .
+      dockerfile: app/src/Monarch/Dockerfile
+    ports:
+      - 8080:8080
