@@ -19,4 +19,4 @@ INSERT INTO sampleTable (resourceName, currentStatus) VALUES
 ('IS-DC3', 'Down');
 
 
-SELECT * FROM monarch..sampleTable;
+

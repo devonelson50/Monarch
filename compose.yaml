@@ -11,12 +11,17 @@ services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
-      SA_PASSWORD: "Your_password123"
+      SA_PASSWORD: ${SQL_PASSWORD}
       ACCEPT_EULA: "Y"
+      # MSSQL_TLS_CERT:
+      # MSSQL_TLS_KEY:
+      # MSSQL_TLS_PROTOCOLS: 1.2,1.3
     ports:
       - 1433:1433
     volumes:
       - sqlserverdata:/var/opt/mssql
-
+      - ./initdb/setup.sql:/usr/config/setup.sql
+      - ./initdb/initdb.sh:/usr/config/initdb.sh
+    command: /bin/bash -c "./usr/config/initdb.sh"
 volumes:
   sqlserverdata:
