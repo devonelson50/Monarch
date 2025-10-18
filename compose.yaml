@@ -8,6 +8,11 @@ services:
       dockerfile: app/src/Monarch/Dockerfile
     ports:
       - 8080:8080
+  monapi-worker:
+    image: monapi-worker
+    build:
+      context: .
+      dockerfile: app/src/Monapi.Worker/Dockerfile
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
