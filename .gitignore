@@ -19,3 +19,4 @@ Thumbs.db
 *.cache.json
 *.sourcelink.json
 *.FileListAbsolute.txt
+.credentials/
