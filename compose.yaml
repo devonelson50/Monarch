@@ -8,6 +8,8 @@ services:
       dockerfile: app/src/Monarch/Dockerfile
     ports:
       - 8080:8080
+    environment:
+      ConnectionStrings__DefaultConnection: "Server=sqlserver;Database=MonarchDB;User Id=sa;Password=${SQL_PASSWORD};TrustServerCertificate=True;"
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
