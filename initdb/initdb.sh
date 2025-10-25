@@ -1,5 +1,30 @@
 #!/bin/bash
 echo "Running initdb.sh."
+
+SA_PATH="/run/secrets/monarch_sql_sa_password"
+MONARCH_PATH="/run/secrets/monarch_sql_monarch_password"
+MONAPI_PATH="/run/secrets/monarch_sql_monapi_password"
+if [ -f "$SA_PATH" ]; then
+    SA_PASSWORD=$(cat $SA_PATH)
+else
+    echo "SA secret file not found. Exiting."
+    exit 2
+fi
+
+if [ -f "$MONARCH_PATH" ]; then
+    MONARCH_PASSWORD=$(cat $MONARCH_PATH)
+else
+    echo "Monarch secret file not found. Exiting."
+    exit 3
+fi
+
+if [ -f "$MONAPI_PATH" ]; then
+    MONAPI_PASSWORD=$(cat $MONAPI_PATH)
+else
+    echo "Monapi file not found. Exiting."
+    exit 4
+fi
+
 #export ODBC_TLS_VER=TLSv1.2
 /opt/mssql/bin/sqlservr &
 SQL_PID=$!
@@ -31,7 +56,9 @@ echo "SQL Server is started. Running setup.sql."
     -U SA \
     -P "$SA_PASSWORD" \
     -d master \
-    -i /usr/config/setup.sql
+    -i /usr/config/setup.sql \
+    -v MONARCH_PASSWORD="$MONARCH_PASSWORD" \
+    -v MONAPI_PASSWORD="$MONAPI_PASSWORD"
 
 echo "Initialization complete. Exiting script."
 wait $SQL_PID
