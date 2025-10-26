@@ -30,8 +30,31 @@ BEGIN
 END 
 GO
 
+-- Drop database users as well
+
+USE monarch;
+IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'monarch')
+BEGIN
+    DROP USER monarch;
+END
+GO
+
+USE monapi;
+IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'monarch')
+BEGIN
+    DROP USER monarch;
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'monapi')
+BEGIN
+    DROP USER monapi;
+END
+GO
+
 -- Create/update service accounts
 
+USE master;
 PRINT "Creating monarch service account.";
 CREATE LOGIN monarch WITH PASSWORD = N'$(MONARCH_PASSWORD)';
 GO
