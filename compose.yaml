@@ -10,6 +10,8 @@ services:
       - 8080:8080
     secrets:
       - monarch_sql_monarch_password
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
   monapi-worker:
     image: monapi-worker
     build:
