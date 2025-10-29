@@ -173,15 +173,15 @@ GO
 IF OBJECT_ID('apps', 'U') IS NULL
 BEGIN
     CREATE TABLE apps (
-        appId INT PRIMARY KEY AUTO_INCREMENT,
+        appId INT IDENTITY(1,1) PRIMARY KEY,
         newRelicId INT NOT NULL,
         nagiosId INT NOT NULL,
         appName VARCHAR(100) NOT NULL,
         status VARCHAR(100) NOT NULL,
         mostRecentIndicentId INT,
-        slackAlert boolean DEFAULT FALSE,
-        jiraAlert boolean DEFAULT FALSE,
-        smtpAlert boolean DEFAULT FALSE
+        slackAlert BIT DEFAULT 0,
+        jiraAlert BIT DEFAULT 0,
+        smtpAlert BIT DEFAULT 0
     );
 END
 GO
@@ -189,7 +189,7 @@ GO
 IF OBJECT_ID('incidents', 'U') IS NULL
 BEGIN
     CREATE TABLE incidents (
-        incidentId INT PRIMARY KEY AUTO_INCREMENT,
+        incidentId INT IDENTITY(1,1) PRIMARY KEY,
         appId INT NOT NULL,
         openTime DATETIME NOT NULL,
         closeTime DATETIME
