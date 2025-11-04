@@ -86,7 +86,7 @@ ALTER ROLE db_datareader ADD MEMBER monarch;
 IF OBJECT_ID('newRelicApps', 'U') IS NULL
 BEGIN
     CREATE TABLE newRelicApps (
-        appId INT PRIMARY KEY,
+        appId VARCHAR(100) PRIMARY KEY,
         appName VARCHAR(100) NOT NULL,
         status VARCHAR(100) NOT NULL,
         mostRecentIndicentId INT
@@ -97,7 +97,7 @@ GO
 IF OBJECT_ID('newRelicIncidents', 'U') IS NULL
 BEGIN
     CREATE TABLE newRelicIncidents (
-        incidentId INT PRIMARY KEY,
+        incidentId VARCHAR(100) PRIMARY KEY,
         appId INT NOT NULL,
         openTime DATETIME NOT NULL,
         closeTime DATETIME
@@ -174,11 +174,11 @@ IF OBJECT_ID('apps', 'U') IS NULL
 BEGIN
     CREATE TABLE apps (
         appId INT IDENTITY(1,1) PRIMARY KEY,
-        newRelicId INT NOT NULL,
-        nagiosId INT NOT NULL,
+        newRelicId VARCHAR(100),
+        nagiosId VARCHAR(100),
         appName VARCHAR(100) NOT NULL,
         status VARCHAR(100) NOT NULL,
-        mostRecentIndicentId INT,
+        mostRecentIndicentId VARCHAR(100),
         slackAlert BIT DEFAULT 0,
         jiraAlert BIT DEFAULT 0,
         smtpAlert BIT DEFAULT 0
@@ -205,3 +205,12 @@ BEGIN
     );
 END
 GO
+
+-- Insert sample data for front-end testing
+
+INSERT INTO apps (newRelicId, nagiosId, appName, status) VALUES
+('abc123', 'def456', 'HV1', 'Healthy'),
+('ghi789', 'jkl012', 'MONARCH', 'Healthy'),
+('mno345', 'pqr678', 'IS-DC1', 'Degraded'),
+('stu901', 'vwx234', 'IS-DC2', 'Healthy'),
+('yza567', 'bcd890', 'IS-DC3', 'Down');
