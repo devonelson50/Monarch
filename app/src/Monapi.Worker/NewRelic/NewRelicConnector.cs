@@ -1,27 +1,31 @@
 using System.Collections;
 using System.Threading.Tasks;
+using System.Text.Json;
 using RestSharp;
 
-namespace Monapi.Worker;
+namespace Monapi.Worker.NewRelic;
 
 // https://api.newrelic.com/docs/#
-public class NewRelic
+// Upon instantiation, complete a repetitive loop to handle retrieving paginated
+// application data from New Relic's API. Retrieved data is abstracted before being
+// written to the monapi database.
+public class NewRelicConnector
 {
     private readonly String apiKey;
+    private readonly String monapiKey;
 
-    public NewRelic()
+    public NewRelicConnector()
     {
         this.apiKey = File.ReadAllText("/run/secrets/monarch_newrelic_api_key");
         this.monapiKey = File.ReadAllText("/run/secrets/monarch_sql_monapi_password");
-        var apps = GetApps();
-        WriteToDatabse(apps);
-
+        ArrayList apps = GetApps();
+        this.WriteToDatabse(apps);
     }
-
 
     public async Task<ArrayList> GetApps()
     {
         var apps = new ArrayList();
+        var continueLoop = true;
         do
         {
             var uri = "https://api.newrelic.com/v2/applications.json";
@@ -37,11 +41,20 @@ public class NewRelic
             }
             else
             {
-                var content = response.Content;    
+                var content = System.Text.Json.JsonSerializer.Deserialize<ResponseData>(response.Content);
+                foreach (var app in content.applications)
+                {
+                    apps.Add(new NewRelicApp
+                    {
+                        AppId = app.id,
+                        AppName = app.name,
+                        Status = app.health_status
+                    });
+                }
+
+
             }
-
-        } while (true);
-
+        } while (continueLoop);
 
 
 
@@ -49,11 +62,12 @@ public class NewRelic
 
 
 
-            return apps;
+
+        return apps;
     }
-    
+
     public void WriteToDatabase(ArrayList apps)
     {
-        
+
     }
 }
