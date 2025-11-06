@@ -1,14 +1,9 @@
-using System.Collections;
-using System.Threading.Tasks;
-using System.Text.Json;
+using System.Text.Json.Nodes;
+using Microsoft.Data.SqlClient;
 using RestSharp;
 
 namespace Monapi.Worker.NewRelic;
 
-// https://api.newrelic.com/docs/#
-// Upon instantiation, complete a repetitive loop to handle retrieving paginated
-// application data from New Relic's API. Retrieved data is abstracted before being
-// written to the monapi database.
 public class NewRelicConnector
 {
     private readonly String apiKey;
@@ -18,10 +13,23 @@ public class NewRelicConnector
     {
         this.apiKey = File.ReadAllText("/run/secrets/monarch_newrelic_api_key");
         this.monapiKey = File.ReadAllText("/run/secrets/monarch_sql_monapi_password");
-        List<NewRelicApp> apps = GetApps();
-        this.WriteToDatabase(apps);
     }
 
+    /// <summary>
+    /// Complete a connector loop
+    /// </summary>
+    /// <returns></returns>
+    public async Task RunConnector()
+    {
+        List<NewRelicApp> apps = await GetApps();
+        await this.WriteToDatabase(apps);
+    }
+
+    /// <summary>
+    /// Retrieve a list of NewRelic applications from the API
+    /// </summary>
+    /// <returns>Dynamic list of abstracted applications</returns>
+    /// <exception cref="Exception"></exception>
     private async Task<List<NewRelicApp>> GetApps()
     {
         var apps = new List<NewRelicApp>();
@@ -40,7 +48,7 @@ public class NewRelicConnector
             }
             else
             {
-                JsonNode jNode = JsonNode.Parse(response.Content);    
+                JsonNode jNode = JsonNode.Parse(response.Content);
                 foreach (var app in jNode["applications"].AsArray())
                 {
                     apps.Add(new NewRelicApp
@@ -50,13 +58,18 @@ public class NewRelicConnector
                         Status = app["health_status"].ToString()
                     });
                 }
-                uri = jNode["link"]["next"]; // Get the next page, if null terminate the loop
+                uri = jNode["link"]["next"].ToString(); // Get the next page, if null terminate the loop
             }
         } while (uri != null);
 
         return apps;
     }
 
+    /// <summary>
+    /// Writes application list to the monapi database
+    /// </summary>
+    /// <param name="apps">Dynamic list of NewRelicApp objects</param>
+    /// <returns></returns>
     private async Task WriteToDatabase(List<NewRelicApp> apps)
     {
         var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={monapiKey};TrustServerCertificate=True;";
@@ -68,9 +81,9 @@ public class NewRelicConnector
                 var query = "INSERT INTO newRelicApps (appId, appName, status) VALUES (@appId, @appName, @status)";
                 using (var command = new SqlCommand(query, connection))
                 {
-                    command.Parameters.AddWithValue("@appId", app.appId);
-                    command.Parameters.AddWithValue("@appName", app.appName);
-                    command.Parameters.AddWithValue("@status", app.status);
+                    command.Parameters.AddWithValue("@appId", app.AppId);
+                    command.Parameters.AddWithValue("@appName", app.AppName);
+                    command.Parameters.AddWithValue("@status", app.Status);
                     await command.ExecuteNonQueryAsync();
                 }
             }
