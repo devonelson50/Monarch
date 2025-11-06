@@ -19,16 +19,16 @@ public class NewRelicConnector
         this.apiKey = File.ReadAllText("/run/secrets/monarch_newrelic_api_key");
         this.monapiKey = File.ReadAllText("/run/secrets/monarch_sql_monapi_password");
         ArrayList apps = GetApps();
-        this.WriteToDatabse(apps);
+        this.WriteToDatabase(apps);
     }
 
-    public async Task<ArrayList> GetApps()
+    private async Task<ArrayList> GetApps()
     {
         var apps = new ArrayList();
         var continueLoop = true;
+        var uri = "https://api.newrelic.com/v2/applications.json";
         do
         {
-            var uri = "https://api.newrelic.com/v2/applications.json";
             var options = new RestClientOptions(uri);
             var client = new RestClient(options);
             var request = new RestRequest();
@@ -41,33 +41,40 @@ public class NewRelicConnector
             }
             else
             {
-                var content = System.Text.Json.JsonSerializer.Deserialize<ResponseData>(response.Content);
-                foreach (var app in content.applications)
+                JsonNode jNode = JsonNode.Parse(response.Content);    
+                foreach (var app in jNode["applications"].AsArray())
                 {
                     apps.Add(new NewRelicApp
                     {
-                        AppId = app.id,
-                        AppName = app.name,
-                        Status = app.health_status
+                        AppId = app["id"].ToString(),
+                        AppName = app["name"].ToString(),
+                        Status = app["health_status"].ToString()
                     });
                 }
-
-
+                uri = jNode["link"]["next"]; // Get the next page, if null terminate the loop
             }
-        } while (continueLoop);
-
-
-
-
-
-
-
+        } while (uri != null);
 
         return apps;
     }
 
-    public void WriteToDatabase(ArrayList apps)
+    private async Task WriteToDatabase(List<NewRelicApp> apps)
     {
-
+        var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={monapiKey};TrustServerCertificate=True;";
+        using (var connection = new SqlConnection(connectionString))
+        {
+            await connection.OpenAsync();
+            foreach (NewRelicApp app in apps)
+            {
+                var query = "INSERT INTO newRelicApps (appId, appName, status) VALUES (@appId, @appName, @status)";
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@appId", app.appId);
+                    command.Parameters.AddWithValue("@appName", app.appName);
+                    command.Parameters.AddWithValue("@status", app.status);
+                    await command.ExecuteNonQueryAsync();
+                }
+            }
+        }
     }
 }

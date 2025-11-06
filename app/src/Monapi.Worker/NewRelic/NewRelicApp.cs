@@ -1,5 +1,3 @@
-using Microsoft.VisualBasic;
-
 namespace Monapi.Worker.NewRelic;
 
 // Used to abstract New Relic application data.
