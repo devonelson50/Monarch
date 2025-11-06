@@ -18,14 +18,13 @@ public class NewRelicConnector
     {
         this.apiKey = File.ReadAllText("/run/secrets/monarch_newrelic_api_key");
         this.monapiKey = File.ReadAllText("/run/secrets/monarch_sql_monapi_password");
-        ArrayList apps = GetApps();
+        List<NewRelicApp> apps = GetApps();
         this.WriteToDatabase(apps);
     }
 
-    private async Task<ArrayList> GetApps()
+    private async Task<List<NewRelicApp>> GetApps()
     {
-        var apps = new ArrayList();
-        var continueLoop = true;
+        var apps = new List<NewRelicApp>();
         var uri = "https://api.newrelic.com/v2/applications.json";
         do
         {

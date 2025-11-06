@@ -18,7 +18,7 @@ services:
     secrets:
       - monarch_sql_monapi_password
       - monarch_newrelic_api_key
-      - monarch_nagios_api_key
+      - monarch_nagios_api_details
       - monarch_jira_api_key
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
