@@ -1,0 +1,27 @@
+@page "/admin"
+@using Monarch.Components
+@rendermode InteractiveServer
+
+<PageTitle>Admin Console - Monarch</PageTitle>
+
+<NavBar />
+
+<div class="admin-page">
+    <h1>Admin Console</h1>
+    <!-- Admin console content will go here -->
+</div>
+
+<style>
+    .admin-page {
+        padding: 24px;
+        background-color: #2D2D2D;
+        min-height: calc(100vh - 64px);
+        color: #FFFFFF;
+    }
+
+    .admin-page h1 {
+        font-size: 24px;
+        font-weight: 500;
+        margin: 0 0 24px 0;
+    }
+</style>
