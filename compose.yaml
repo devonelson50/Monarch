@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: app/src/Monarch/Dockerfile
     ports:
-      - 80:80
+      - 8080:8080
     secrets:
       - monarch_sql_monarch_password
   monapi-worker:
@@ -15,6 +15,9 @@ services:
     build:
       context: .
       dockerfile: app/src/Monapi.Worker/Dockerfile
+    depends_on:
+      sqlserver:
+        condition: service_healthy
     secrets:
       - monarch_sql_monapi_password
       - monarch_newrelic_api_key
@@ -35,6 +38,10 @@ services:
       - ./initdb/setup.sql:/usr/config/setup.sql
       - ./initdb/initdb.sh:/usr/config/initdb.sh
     command: /bin/bash -c "./usr/config/initdb.sh"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -N -C -h -1 -t 1 -U SA -P \"$(cat /run/secrets/monarch_sql_sa_password)\" -Q \"SET NOCOUNT ON; SELECT SUM(state) FROM sys.databases\" | tr -d ' \\r\\n' | grep -q '^0$'"]
+      interval: 5s
+      retries: 20
     secrets:
       - monarch_sql_sa_password
       - monarch_sql_monarch_password
