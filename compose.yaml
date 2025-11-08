@@ -54,7 +54,7 @@ secrets:
   monarch_newrelic_api_key:
     # external: true
     file: ./.credentials/newrelic_api_key.txt # development only
-  monarch_nagios_api_key:
+  monarch_nagios_api_details:
     # external: true
     file: ./.credentials/nagios_api_key.txt # development only
   monarch_jira_api_key:
