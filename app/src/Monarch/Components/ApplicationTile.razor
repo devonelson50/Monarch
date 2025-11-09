@@ -1,0 +1,233 @@
+@using Monarch.Models
+
+<div class="app-tile @GetStatusClass() @(IsExpanded ? "expanded" : string.Empty)">
+    <div class="tile-header">
+        <span class="app-name">@Application.ResourceName</span>
+        <div class="status-indicator">
+            <span class="status-dot"></span>
+            <button class="expand-btn" title="Expand" aria-label="Expand" aria-expanded="@IsExpanded" @onclick="ExpandAsync">
+                <svg class="expand-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                    <path fill="currentColor" d="M7 3H3v4h2V5h2V3zm12 0h-4v2h2v2h2V3zM5 17H3v4h4v-2H5v-2zm14 0h-2v2h-2v2h4v-4z" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    @if (IsExpanded)
+    {
+        <div class="details">
+            <div class="metrics">
+                <div class="metric">
+                    <span class="label">Uptime</span>
+                    <span class="value">99.9%</span>
+                    <div class="bar"><div class="fill" style="width: 99.9%"></div></div>
+                </div>
+                <div class="metric">
+                    <span class="label">Response</span>
+                    <span class="value">120 ms</span>
+                    <div class="bar"><div class="fill yellow" style="width: 60%"></div></div>
+                </div>
+                <div class="metric">
+                    <span class="label">Error Rate</span>
+                    <span class="value">0.7%</span>
+                    <div class="bar"><div class="fill red" style="width: 7%"></div></div>
+                </div>
+                <div class="metric-row">
+                    <span class="label">Last Checked</span>
+                    <span class="muted">@DateTime.Now.ToString("g")</span>
+                </div>
+                <div class="metric-row">
+                    <span class="label">Incidents (30d)</span>
+                    <span class="muted">2</span>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public ApplicationStatus Application { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<ApplicationStatus> OnExpand { get; set; }
+
+    private bool IsExpanded { get; set; }
+
+    private async Task ExpandAsync()
+    {
+        IsExpanded = !IsExpanded;
+        if (OnExpand.HasDelegate)
+        {
+            await OnExpand.InvokeAsync(Application);
+        }
+    }
+
+    private string GetStatusClass() => Application.Status switch
+    {
+        StatusType.Operational => "status-operational",
+        StatusType.DegradedPerformance => "status-degraded",
+        StatusType.Outage => "status-outage",
+        _ => "status-unknown"
+    };
+}
+
+<style>
+    .app-tile {
+        background-color: #3D3D3D;
+        border-radius: 8px;
+        padding: 12px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        color: white;
+    }
+
+    .tile-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .app-tile:hover {
+        background-color: #4D4D4D;
+    }
+
+    .status-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .status-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+    }
+
+    .expand-btn {
+        background: transparent;
+        border: none;
+        color: #ffffff;
+        opacity: 0.75;
+        padding: 4px;
+        border-radius: 4px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .expand-btn:hover {
+        opacity: 1;
+        background-color: rgba(255, 255, 255, 0.08);
+        transform: scale(1.1);
+    }
+
+    .expand-icon {
+        display: block;
+        transition: transform 0.3s ease;
+    }
+
+    .expanded .expand-icon {
+        transform: rotate(45deg);
+    }
+
+    /* Details section */
+    .app-tile {
+        transition: all 0.3s ease-in-out;
+    }
+
+    .app-tile.expanded {
+        padding-bottom: 16px;
+    }
+
+    .details {
+        margin-top: 12px;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 8px;
+        padding: 12px;
+        width: 100%;
+        animation: slideDown 0.3s ease-out;
+        transform-origin: top;
+    }
+
+    @@keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: scaleY(0);
+            max-height: 0;
+        }
+        to {
+            opacity: 1;
+            transform: scaleY(1);
+            max-height: 500px;
+        }
+    }
+
+    .metrics {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px 16px;
+    }
+
+    .metric, .metric-row {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .metric .label, .metric-row .label {
+        font-size: 12px;
+        color: #BDBDBD;
+    }
+
+    .metric .value {
+        font-size: 13px;
+        color: #FFFFFF;
+        font-weight: 600;
+    }
+
+    .muted {
+        color: #CCCCCC;
+        font-size: 13px;
+    }
+
+    .bar {
+        height: 6px;
+        border-radius: 4px;
+        background: rgba(255,255,255,0.12);
+        overflow: hidden;
+    }
+
+    .bar .fill {
+        height: 100%;
+        background: #4CAF50; /* green */
+    }
+
+    .bar .fill.yellow {
+        background: #FFC107;
+    }
+
+    .bar .fill.red {
+        background: #F44336;
+    }
+
+    .status-operational .status-dot {
+        background-color: #4CAF50;
+    }
+
+    .status-degraded .status-dot {
+        background-color: #FFC107;
+    }
+
+    .status-outage .status-dot {
+        background-color: #F44336;
+    }
+
+    .status-unknown .status-dot {
+        background-color: #9E9E9E;
+    }
+</style>

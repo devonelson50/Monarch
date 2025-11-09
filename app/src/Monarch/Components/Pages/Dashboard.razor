@@ -1,0 +1,196 @@
+@page "/"
+@using Monarch.Models
+@rendermode InteractiveServer
+
+<PageTitle>Monarch</PageTitle>
+
+<NavBar />
+
+<div class="dashboard">
+    <header class="dashboard-header">
+        <div class="filter-section">
+            <select class="filter-select" @onchange="OnSortChanged" value="@selectedSort">
+                <option value="status">Filter by: Status</option>
+                <option value="alpha">Filter by: Alphabetical</option>
+            </select>
+        </div>
+    </header>
+
+    <div class="applications-grid">
+        @foreach (var app in applications)
+        {
+            <div class="@($"app-item {(draggingId == app.Id ? "dragging" : string.Empty)} {(dragOverId == app.Id ? "drag-over" : string.Empty)}")"
+                draggable="true" @ondragstart="@(() => OnDragStart(app.Id))" @ondragover:preventDefault="true"
+                @ondragover="@(() => OnDragOver(app.Id))" @ondrop="@(() => OnDrop(app.Id))" @ondragend="OnDragEnd"
+                @key="app.Id">
+                <ApplicationTile Application="app" />
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<ApplicationStatus> applications = new();
+    private List<ApplicationStatus> allApplications = new();
+    private string selectedSort = "status";
+    private string? draggingId;
+    private string? dragOverId;
+
+    protected override void OnInitialized()
+    {
+        // Mock data matching the Figma layout
+        allApplications = Enumerable.Range(1, 20)
+        .Select(i => new ApplicationStatus
+        {
+            Id = i.ToString(),
+            Name = $"Application {i}",
+            Status = i switch
+            {
+                <= 15 => StatusType.Operational,
+                <= 17 => StatusType.DegradedPerformance,
+                _ => StatusType.Outage
+            }
+        })
+        .ToList();
+
+        ApplySort();
+    }
+
+    private void OnSortChanged(ChangeEventArgs e)
+    {
+        selectedSort = e.Value?.ToString() ?? "status";
+        ApplySort();
+    }
+
+    private void ApplySort()
+    {
+        applications = selectedSort switch
+        {
+            "alpha" => allApplications.OrderBy(a => a.Name).ToList(),
+            "status" => allApplications
+            .OrderBy(a => a.Status switch
+            {
+                StatusType.Outage => 0,
+                StatusType.DegradedPerformance => 1,
+                StatusType.Operational => 2,
+                _ => 3
+            })
+            .ThenBy(a => a.Name)
+            .ToList(),
+            _ => allApplications.ToList()
+        };
+    }
+
+    // Drag & drop
+    private void OnDragStart(string id)
+    {
+        draggingId = id;
+    }
+
+    private void OnDragOver(string overId)
+    {
+        dragOverId = overId;
+        StateHasChanged();
+    }
+
+    private void OnDrop(string dropTargetId)
+    {
+        if (draggingId is null || draggingId == dropTargetId)
+        {
+            ClearDragState();
+            return;
+        }
+
+        var fromIndex = applications.FindIndex(a => a.Id == draggingId);
+        var toIndex = applications.FindIndex(a => a.Id == dropTargetId);
+        if (fromIndex < 0 || toIndex < 0)
+        {
+            ClearDragState();
+            return;
+        }
+
+        var item = applications[fromIndex];
+        applications.RemoveAt(fromIndex);
+        // After removal, the target index may shift if it was after the removed item
+        if (fromIndex < toIndex) toIndex--;
+        applications.Insert(toIndex, item);
+
+        // Persist this as the new custom order baseline
+        allApplications = applications.ToList();
+
+        ClearDragState();
+    }
+
+    private void OnDragEnd()
+    {
+        ClearDragState();
+    }
+
+    private void ClearDragState()
+    {
+        draggingId = null;
+        dragOverId = null;
+        StateHasChanged();
+    }
+}
+
+<style>
+    .dashboard {
+        padding: 24px;
+        background-color: #2D2D2D;
+        min-height: calc(100vh - 64px);
+    }
+
+    .dashboard-header {
+        margin-bottom: 24px;
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .filter-section {
+        color: #A0A0A0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .applications-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+    }
+
+    .app-item {
+        cursor: move;
+        transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+        position: relative;
+    }
+
+    .app-item.dragging {
+        opacity: 0.5;
+        transform: scale(1.05);
+        z-index: 1000;
+        transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+
+    .app-item.drag-over {
+        outline: 2px dashed rgba(255, 255, 255, 0.35);
+        outline-offset: 2px;
+        transform: scale(0.95);
+        transition: all 0.2s ease;
+    }
+
+    .app-item:not(.dragging):not(.drag-over) {
+        transform: scale(1);
+    }
+
+    .filter-select {
+        background-color: #3D3D3D;
+        color: #FFFFFF;
+        border: 1px solid #5A5A5A;
+        padding: 6px 10px;
+        border-radius: 6px;
+        font-family: 'Oswald', sans-serif;
+        font-size: 14px;
+    }
+</style>
