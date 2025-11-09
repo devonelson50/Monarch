@@ -58,3 +58,14 @@ h1:focus {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+.no-focus:focus{
+    outline: none !important;
+    box-shadow: none !important;
+    border-color: rgba(0,0,0,0) !important;
+}
+
+.no-focus:hover{
+    box-shadow: 0 0 8px rgba(108, 117, 125, 0.5) !important;
+    transition: box-shadow 0.2s ease-in-out;
+}

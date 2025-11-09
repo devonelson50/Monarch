@@ -1,0 +1,62 @@
+@page "/admin"
+<PageTitle>Admin Template</PageTitle>
+@rendermode InteractiveServer
+
+<div class="container position-relative pt-5">
+  <button class="btn position-absolute top-0 end-0 me-3 no-focus" 
+    @onclick="ToggleCard">
+    <i class="bi bi-gear-fill"></i>
+  </button>
+</div>
+
+
+@if (showCard)
+{
+  <div class="d-flex justify-content-center vh-100">
+    <div class="card shadow" style="width: 95%;">
+      <div class="card-header border-bottom-0 pb-0">
+        <ul class="nav nav-tabs card-header-tabs">
+          <li class="nav-item">
+            @{
+              var users = "users";
+              var notifications = "notifications";
+            }
+            <button class="nav-link @(activeTab == "users" ? "active" : "")"
+              @onclick="() => SwitchTab(users)">
+              Users
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link @(activeTab == "notifications" ? "active" : "")"
+              @onclick="() => SwitchTab(notifications)">
+              Notifications
+            </button>
+          </li>
+        </ul>
+      </div>
+
+       <div class="card-body">
+                @if (activeTab == "users"){
+                  <h5 class="card-title">User Settings</h5>
+                }
+                else if (activeTab == "notifications"){
+                    <h5 class="card-title">Notification Settings</h5>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+  bool showCard = false;
+  string activeTab = "user";
+
+  void ToggleCard(){
+    showCard = !showCard;
+  }
+
+  void SwitchTab(string tab)
+    {
+        activeTab = tab;
+    }
+}
