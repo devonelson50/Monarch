@@ -11,6 +11,12 @@ BEGIN
 END
 GO
 
+IF DB_ID('keycloak') IS NULL
+BEGIN
+    CREATE DATABASE keycloak;
+END
+GO
+
 -- If they already exist, drop and recreate service accounts.
 -- This ensures permissions are correct, and login details 
 -- match the injected secrets.
@@ -27,6 +33,13 @@ IF SUSER_ID('monapi') IS NOT NULL
 BEGIN
     PRINT "Dropping pre-existing monapi account.";
     DROP LOGIN monapi;
+END 
+GO
+
+IF SUSER_ID('keycloak') IS NOT NULL
+BEGIN
+    PRINT "Dropping pre-existing keycloak account.";
+    DROP LOGIN keycloak;
 END 
 GO
 
@@ -52,6 +65,13 @@ BEGIN
 END
 GO
 
+USE keycloak;
+IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'keycloak')
+BEGIN
+    DROP USER keycloak;
+END
+GO
+
 -- Create/update service accounts
 
 USE master;
@@ -63,7 +83,17 @@ PRINT "Creating monapi service account.";
 CREATE LOGIN monapi WITH PASSWORD = N'$(MONAPI_PASSWORD)';
 GO
 
+PRINT "Creating keycloak service account.";
+CREATE LOGIN keycloak WITH PASSWORD = N'$(KEYCLOAK_PASSWORD)';
+GO
+
 -- Set permission levels for each service account
+
+-- keycloak user should have full access to keycloak database
+USE keycloak;
+CREATE USER keycloak FOR LOGIN keycloak;
+ALTER ROLE db_owner ADD MEMBER keycloak;
+GO
 
 -- monarch account needs r/w to monarch db
 USE monarch;
