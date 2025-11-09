@@ -6,6 +6,12 @@ services:
     build:
       context: .
       dockerfile: app/src/Monarch/Dockerfile
+    environment:
+      OIDC_IDP_ADDRESS_FOR_SERVER: "http://keycloak:8080/realms/monarch"
+      OIDC_IDP_ADDRESS_FOR_CLIENT: "http://localhost/realms/monarch"
+      OIDC_CLIENT_ID: "monarch-client"
+      OIDC_REQUIRE_HTTPS_METADATA: "false"
+      HTTPCLIENT_VALIDATE_EXTERNAL_CERTIFICATE: "false"
     ports:
       - 8080:8080
     depends_on:
@@ -53,7 +59,6 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     environment:
-      KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_DB: mssql
       KC_DB_URL: jdbc:sqlserver://sqlserver:1433;databaseName=keycloak;encrypt=false;trustServerCertificate=true;
       KC_DB_USERNAME: keycloak
@@ -61,7 +66,7 @@ services:
       KC_PROXY: 'edge' 
       KC_HOSTNAME_STRICT: 'false'
     entrypoint: /bin/bash
-    command: -c "export KC_DB_PASSWORD=$(cat /run/secrets/monarch_sql_keycloak_password) && export KC_BOOTSTRAP_ADMIN_PASSWORD=$(cat /run/secrets/monarch_keycloak_admin) && /opt/keycloak/bin/kc.sh start-dev"
+    command: -c "export KC_DB_PASSWORD=$(cat /run/secrets/monarch_sql_keycloak_password) && /opt/keycloak/bin/kc.sh import --file /opt/keycloak/data/import/realm.json && /opt/keycloak/bin/kc.sh start-dev"
     ports:
       - 80:8080
     volumes:
@@ -70,7 +75,6 @@ services:
       sqlserver:
         condition: service_healthy
     secrets:
-      - monarch_keycloak_admin
       - monarch_sql_keycloak_password
 volumes:
   sqlserverdata:
@@ -99,6 +103,3 @@ secrets:
   monarch_slack_webhooks:
     # external: true
     file: ./.credentials/slack_webhooks.json # development only
-  monarch_keycloak_admin:
-    # external: true
-    file: ./.credentials/keycloak_admin.txt # development only
