@@ -12,12 +12,12 @@
         </div>
 
         <div class="navbar-right">
-            <a href="/admin" class="icon-btn console-btn" title="Admin Console" aria-label="Admin Console">
+            <button href="/admin" class="icon-btn console-btn" title="Admin Console" aria-label="Admin Console" @onclick="ToggleAdmin">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                     <path
                         d="M20 3H4c-1.11 0-2 .89-2 2v11c0 1.11.89 2 2 2h3v2h10v-2h3c1.11 0 2-.89 2-2V5c0-1.11-.89-2-2-2zm0 13H4V5h16v11zm-2-9H6v2h12V7zm0 4H6v2h12v-2z" />
                 </svg>
-            </a>
+            </button>
             <a href="/profile" class="icon-btn user-btn" title="User Profile" aria-label="User Profile">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                     <path
@@ -27,6 +27,47 @@
         </div>
     </div>
 </nav>
+
+@if (toggleAdmin)
+{
+    <div class="admin-overlay" @onclick="CloseAdmin">
+        <div class="admin-card card shadow" @onclick:stopPropagation>
+            <div class="card-header border-bottom-0 pb-0 d-flex justify-content-between align-items-center">
+                <ul class="nav nav-tabs card-header-tabs">
+                    <li class="nav-item">
+                        <button class="nav-link @(activeTab == TabNotification ? "active" : "")"
+                                @onclick="() => SwitchTab(TabNotification)">
+                            Notification Settings
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link @(activeTab == TabUser ? "active" : "")"
+                                @onclick="() => SwitchTab(TabUser)">
+                            User Settings
+                        </button>
+                    </li>
+                </ul>
+                <button class="btn btn-sm btn-outline-light no-focus" @onclick="CloseAdmin">
+                    ✕
+                </button>
+            </div>
+
+            <div class="card-body">
+                @if (activeTab == TabNotification)
+                {
+                    <h5 class="card-title">Notification Settings</h5>
+                    <p class="card-text">Notifications</p>
+                }
+                else if (activeTab == TabUser)
+                {
+                    <h5 class="card-title">User Settings</h5>
+                    <p class="card-text">Users</p>
+                }
+            </div>
+        </div>
+    </div>
+}
+
 
 <style>
     .navbar {
@@ -122,4 +163,48 @@
         height: 36px;
         border-radius: 50%;
     }
+
+    .admin-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    animation: fadeIn 0.2s ease-in;
+}
+
+.admin-card {
+    width: 420px;
+    max-width: 90vw;
+    background-color: #2D2D2D;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    animation: popIn 0.2s ease-out;
+}
+
+.admin-card .nav-link.active {
+    border-color: #fff;
+    border-bottom: 2px solid #fff;
+}
+
+.no-focus:focus,
+.no-focus:focus-visible,
+.no-focus:active {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
 </style>
+
+@code {
+    private bool toggleAdmin = false;
+    private const string TabNotification = "notification";
+    private const string TabUser = "user";
+    private string activeTab = TabNotification;
+
+    private void ToggleAdmin() => toggleAdmin = !toggleAdmin;
+    private void CloseAdmin() => toggleAdmin = false;
+    private void SwitchTab(string tab) => activeTab = tab;
+}
