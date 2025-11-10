@@ -205,12 +205,3 @@ BEGIN
     );
 END
 GO
-
--- Insert sample data for front-end testing
-
-INSERT INTO apps (newRelicId, nagiosId, appName, status) VALUES
-('abc123', 'def456', 'HV1', 'Healthy'),
-('ghi789', 'jkl012', 'MONARCH', 'Healthy'),
-('mno345', 'pqr678', 'IS-DC1', 'Degraded'),
-('stu901', 'vwx234', 'IS-DC2', 'Healthy'),
-('yza567', 'bcd890', 'IS-DC3', 'Down');

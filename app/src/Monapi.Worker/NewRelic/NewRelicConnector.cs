@@ -70,16 +70,24 @@ public class NewRelicConnector
     /// </summary>
     /// <param name="apps">Dynamic list of NewRelicApp objects</param>
     /// <returns></returns>
-    private async Task WriteToDatabase(List<NewRelicApp> apps)
+    public async Task WriteToDatabase(List<NewRelicApp> apps)
     {
         var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={monapiKey};TrustServerCertificate=True;";
         using (var connection = new SqlConnection(connectionString))
         {
             await connection.OpenAsync();
+            // Delete existing data
+            // This implementation causes a brief window where the database is not fully refreshed.
+            // A UI update during this window may display few or no apps.
+            var query = "DELETE FROM newRelicApps"; 
+            using (var command = new SqlCommand(query, connection))
+            {
+                await command.ExecuteNonQueryAsync();
+            }
             foreach (NewRelicApp app in apps)
             {
-                var query = "INSERT INTO newRelicApps (appId, appName, status) VALUES (@appId, @appName, @status)";
-                using (var command = new SqlCommand(query, connection))
+                var q = "INSERT INTO newRelicApps (appId, appName, status) VALUES (@appId, @appName, @status)";
+                using (var command = new SqlCommand(q, connection))
                 {
                     command.Parameters.AddWithValue("@appId", app.AppId);
                     command.Parameters.AddWithValue("@appName", app.AppName);
