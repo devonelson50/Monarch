@@ -1,5 +1,6 @@
 using Monarch.Components;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
+using Monarch.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,6 +9,8 @@ StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configurat
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddSignalR();
 
 var app = builder.Build();
 
@@ -27,5 +30,7 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+app.MapHub<DashboardHub>("/hubs/dashboard");
 
 app.Run();

@@ -1,5 +1,7 @@
 @page "/"
 @using Monarch.Models
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager NavManager
 @rendermode InteractiveServer
 
 <PageTitle>Monarch</PageTitle>
@@ -36,24 +38,53 @@
     private string? draggingId;
     private string? dragOverId;
 
-    protected override void OnInitialized()
+    private HubConnection? hubConnection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavManager.ToAbsoluteUri("/hubs/dashboard"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On("ApplicationsUpdated", async () =>
+        {
+            await LoadApplicationsAsync();  // re-get data (right now it's mock)
+            ApplySort();
+            StateHasChanged();
+        });
+
+        await hubConnection.StartAsync();
+        await LoadApplicationsAsync();
+        ApplySort();
+    }
+
+    private Task LoadApplicationsAsync()
     {
         // Mock data matching the Figma layout
         allApplications = Enumerable.Range(1, 20)
-        .Select(i => new ApplicationStatus
-        {
-            Id = i.ToString(),
-            Name = $"Application {i}",
-            Status = i switch
+            .Select(i => new ApplicationStatus
             {
-                <= 15 => StatusType.Operational,
-                <= 17 => StatusType.DegradedPerformance,
-                _ => StatusType.Outage
-            }
-        })
-        .ToList();
+                Id = i.ToString(),
+                Name = $"Application {i}",
+                Status = i switch
+                {
+                    <= 15 => StatusType.Operational,
+                    <= 17 => StatusType.DegradedPerformance,
+                    _ => StatusType.Outage
+                }
+            })
+            .ToList();
 
-        ApplySort();
+        return Task.CompletedTask;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
     }
 
     private void OnSortChanged(ChangeEventArgs e)
