@@ -55,13 +55,99 @@
             <div class="card-body">
                 @if (activeTab == TabNotification)
                 {
-                    <h5 class="card-title">Notification Settings</h5>
-                    <p class="card-text">Notifications</p>
+                    <form>
+                        <input type="checkbox" id="jiraWarn" class="notiBox"/>
+                        <label for="jiraWarn">Create Jira when application status reaches <span class="warning">Warning</span></label>
+                        <br />
+                        <input type="checkbox" id="jiraDown" class="notiBox"/>
+                        <label for="jiraDown">Create Jira when application status reaches <span class="down">Down</span></label>
+                        <br />
+                        <input type="checkbox" id="slackWarn" class="notiBox"/>
+                        <label for="slackWarn">Create Slack when application status reaches <span class="warning">Warning</span></label>
+                        <br />
+                        <input type="checkbox" id="slackDown" class="notiBox"/>
+                        <label for="slackDown">Create Slack when application status reaches <span class="down">Down</span></label>
+                        <br />
+                        <button type="submit">Apply Changes</button>
+                    </form>
                 }
                 else if (activeTab == TabUser)
                 {
-                    <h5 class="card-title">User Settings</h5>
-                    <p class="card-text">Users</p>
+                    <form>
+                        <input type="checkbox" id="app1" class="userBox"/>
+                        <label for="app1">App 1</label>
+
+                        <input type="checkbox" id="app2" class="userBox"/>
+                        <label for="app2">App 2</label>
+
+                        <input type="checkbox" id="app3" class="userBox"/>
+                        <label for="app3">App 3</label>
+
+                        <input type="checkbox" id="app4" class="userBox"/>
+                        <label for="app4">App 4</label>
+
+                        <br />
+
+                        <input type="checkbox" id="app5" class="userBox"/>
+                        <label for="app5">App 5</label>
+
+                        <input type="checkbox" id="app6" class="userBox"/>
+                        <label for="app6">App 6</label>
+
+                        <input type="checkbox" id="app7" class="userBox"/>
+                        <label for="app7">App 7</label>
+
+                        <input type="checkbox" id="app8" class="userBox"/>
+                        <label for="app8">App 8</label>
+
+                        <br />
+
+                        <input type="checkbox" id="app9" class="userBox"/>
+                        <label for="app9">App 9</label>
+
+                        <input type="checkbox" id="app10" class="userBox"/>
+                        <label for="app10">App 10</label>
+
+                        <input type="checkbox" id="app11" class="userBox"/>
+                        <label for="app11">App 11</label>
+
+                        <input type="checkbox" id="app12" class="userBox"/>
+                        <label for="app12">App 12</label>
+
+                        <br />
+
+
+                        <input type="checkbox" id="app13" class="userBox"/>
+                        <label for="app13">App 13</label>
+
+                        <input type="checkbox" id="app14" class="userBox"/>
+                        <label for="app14">App 14</label>
+
+                        <input type="checkbox" id="app15" class="userBox"/>
+                        <label for="app15">App 15</label>
+
+                        <input type="checkbox" id="app16" class="userBox"/>
+                        <label for="app16">App 16</label>
+
+                        <br />
+
+                        <input type="checkbox" id="app17" class="userBox"/>
+                        <label for="app17">App 17</label>
+
+                        <input type="checkbox" id="app18" class="userBox"/>
+                        <label for="app18">App 18</label>
+
+                        <input type="checkbox" id="app19" class="userBox"/>
+                        <label for="app19">App 19</label>
+
+                        <input type="checkbox" id="app20" class="userBox"/>
+                        <label for="app20">App 20</label>
+
+                        <br />
+
+
+                        <button type="submit">Apply Changes</button>
+                    </form>
                 }
             </div>
         </div>
@@ -194,6 +280,23 @@
 .no-focus:active {
     outline: none !important;
     box-shadow: none !important;
+}
+
+.warning{
+    color: yellow;
+}
+
+.down{
+    color: red;
+}
+
+.notiBox{
+    margin: 0 0 15px 0;
+}
+
+.userBox{
+    margin: 0 -15px 15px 0;
+    width: 15%;
 }
 
 </style>
