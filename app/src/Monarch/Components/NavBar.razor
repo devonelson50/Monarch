@@ -35,13 +35,13 @@
             <div class="card-header border-bottom-0 pb-0 d-flex justify-content-between align-items-center">
                 <ul class="nav nav-tabs card-header-tabs">
                     <li class="nav-item">
-                        <button class="nav-link @(activeTab == TabNotification ? "active" : "")"
+                        <button class="nav-link tab @(activeTab == TabNotification ? "active" : "")"
                                 @onclick="() => SwitchTab(TabNotification)">
                             Notification Settings
                         </button>
                     </li>
                     <li class="nav-item">
-                        <button class="nav-link @(activeTab == TabUser ? "active" : "")"
+                        <button class="nav-link tab @(activeTab == TabUser ? "active" : "")"
                                 @onclick="() => SwitchTab(TabUser)">
                             User Settings
                         </button>
@@ -55,99 +55,128 @@
             <div class="card-body">
                 @if (activeTab == TabNotification)
                 {
-                    <form>
-                        <input type="checkbox" id="jiraWarn" class="notiBox"/>
+                    <EditForm Model="notifModel" OnValidSubmit="SaveNotifications">
+                        <input type="checkbox" id="jiraWarn" class="notiBox" @bind="notifModel.jiraWarn" />
                         <label for="jiraWarn">Create Jira when application status reaches <span class="warning">Warning</span></label>
                         <br />
-                        <input type="checkbox" id="jiraDown" class="notiBox"/>
+                        <input type="checkbox" id="jiraDown" class="notiBox" @bind="notifModel.jiraDown"/>
                         <label for="jiraDown">Create Jira when application status reaches <span class="down">Down</span></label>
                         <br />
-                        <input type="checkbox" id="slackWarn" class="notiBox"/>
+                        <input type="checkbox" id="slackWarn" class="notiBox" @bind="notifModel.slackWarn"/>
                         <label for="slackWarn">Create Slack when application status reaches <span class="warning">Warning</span></label>
                         <br />
-                        <input type="checkbox" id="slackDown" class="notiBox"/>
+                        <input type="checkbox" id="slackDown" class="notiBox" @bind="notifModel.slackDown"/>
                         <label for="slackDown">Create Slack when application status reaches <span class="down">Down</span></label>
                         <br />
-                        <button type="submit">Apply Changes</button>
-                    </form>
+                        <div class="d-flex justify-content-end button-container">
+                            <button type="submit" >Apply Changes</button>
+                        </div>
+                    </EditForm>
                 }
                 else if (activeTab == TabUser)
                 {
-                    <form>
-                        <input type="checkbox" id="app1" class="userBox"/>
-                        <label for="app1">App 1</label>
-
-                        <input type="checkbox" id="app2" class="userBox"/>
-                        <label for="app2">App 2</label>
-
-                        <input type="checkbox" id="app3" class="userBox"/>
-                        <label for="app3">App 3</label>
-
-                        <input type="checkbox" id="app4" class="userBox"/>
-                        <label for="app4">App 4</label>
-
-                        <br />
-
-                        <input type="checkbox" id="app5" class="userBox"/>
-                        <label for="app5">App 5</label>
-
-                        <input type="checkbox" id="app6" class="userBox"/>
-                        <label for="app6">App 6</label>
-
-                        <input type="checkbox" id="app7" class="userBox"/>
-                        <label for="app7">App 7</label>
-
-                        <input type="checkbox" id="app8" class="userBox"/>
-                        <label for="app8">App 8</label>
-
-                        <br />
-
-                        <input type="checkbox" id="app9" class="userBox"/>
-                        <label for="app9">App 9</label>
-
-                        <input type="checkbox" id="app10" class="userBox"/>
-                        <label for="app10">App 10</label>
-
-                        <input type="checkbox" id="app11" class="userBox"/>
-                        <label for="app11">App 11</label>
-
-                        <input type="checkbox" id="app12" class="userBox"/>
-                        <label for="app12">App 12</label>
-
-                        <br />
-
-
-                        <input type="checkbox" id="app13" class="userBox"/>
-                        <label for="app13">App 13</label>
-
-                        <input type="checkbox" id="app14" class="userBox"/>
-                        <label for="app14">App 14</label>
-
-                        <input type="checkbox" id="app15" class="userBox"/>
-                        <label for="app15">App 15</label>
-
-                        <input type="checkbox" id="app16" class="userBox"/>
-                        <label for="app16">App 16</label>
-
-                        <br />
-
-                        <input type="checkbox" id="app17" class="userBox"/>
-                        <label for="app17">App 17</label>
-
-                        <input type="checkbox" id="app18" class="userBox"/>
-                        <label for="app18">App 18</label>
-
-                        <input type="checkbox" id="app19" class="userBox"/>
-                        <label for="app19">App 19</label>
-
-                        <input type="checkbox" id="app20" class="userBox"/>
-                        <label for="app20">App 20</label>
-
-                        <br />
-
-
-                        <button type="submit">Apply Changes</button>
-                    </form>
+                    <EditForm Model="userModel" OnValidSubmit="SaveUsers">
+                        <div class="container">
+                            <!--<div class="row">
+                                <div class="col-md-4">
+                                    <button class="selectButton" @onclick="ShowUsers">Select User</button>
+                                </div>
+                            </div>-->
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app1" class="userBox" @bind="userModel.App1"/>
+                                    <label for="app1">App 1</label>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app2" class="userBox" @bind="userModel.App2"/>
+                                    <label for="app2">App 2</label>    
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app3" class="userBox"@bind="userModel.App3"/>
+                                    <label for="app3">App 3</label>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app4" class="userBox" @bind="userModel.App4"/>
+                                    <label for="app4">App 4</label>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app5" class="userBox" @bind="userModel.App5"/>
+                                    <label for="app5">App 5</label>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app6" class="userBox" @bind="userModel.App6"/>
+                                    <label for="app6">App 6</label>    
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app7" class="userBox" @bind="userModel.App7"/>
+                                    <label for="app7">App 7</label>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app8" class="userBox" @bind="userModel.App8"/>
+                                    <label for="app8">App 8</label>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app9" class="userBox" @bind="userModel.App9"/>
+                                    <label for="app9">App 9</label>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app10" class="userBox" @bind="userModel.App10"/>
+                                    <label for="app10">App 10</label>    
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app11" class="userBox" @bind="userModel.App11"/>
+                                    <label for="app11">App 11</label>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app12" class="userBox" @bind="userModel.App12"/>
+                                    <label for="app12">App 12</label>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app13" class="userBox" @bind="userModel.App13"/>
+                                    <label for="app13">App 13</label>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app14" class="userBox" @bind="userModel.App14"/>
+                                    <label for="app14">App 14</label>    
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app15" class="userBox" @bind="userModel.App15"/>
+                                    <label for="app15">App 15</label>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app16" class="userBox" @bind="userModel.App16"/>
+                                    <label for="app16">App 16</label>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app17" class="userBox" @bind="userModel.App17"/>
+                                    <label for="app17">App 17</label>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app18" class="userBox" @bind="userModel.App18"/>
+                                    <label for="app18">App 18</label>    
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app19" class="userBox" @bind="userModel.App19"/>
+                                    <label for="app19">App 19</label>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="checkbox" id="app20" class="userBox" @bind="userModel.App20"/>
+                                    <label for="app20">App 20</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-end button-container">
+                            <button type="submit" >Apply Changes</button>
+                        </div>
+                    </EditForm>
                 }
             </div>
         </div>
@@ -295,8 +324,19 @@
 }
 
 .userBox{
-    margin: 0 -15px 15px 0;
-    width: 15%;
+    margin-bottom: 15px;
+}
+
+.selectButton{
+    margin-bottom: 15px;
+}
+
+.buttonContainer{
+    margin: 15px 0;
+}
+
+.tab{
+    color: white;
 }
 
 </style>
@@ -310,4 +350,47 @@
     private void ToggleAdmin() => toggleAdmin = !toggleAdmin;
     private void CloseAdmin() => toggleAdmin = false;
     private void SwitchTab(string tab) => activeTab = tab;
+    private void ShowUsers() => toggleAdmin = false; //will be changed later when users have been implemented properly
+
+    private NotificationSettings notifModel = new();
+    private UserAppSelection userModel = new();
+
+    private void SaveNotifications(){
+
+    }
+
+    private void SaveUsers(){
+
+    }
+    
+    public class NotificationSettings{
+        public bool jiraWarn { get; set; }
+        public bool jiraDown { get; set; }
+        public bool slackWarn { get; set; } 
+        public bool slackDown { get; set; }
+    }
+
+    public class UserAppSelection{
+        public bool App1{ get; set; }
+        public bool App2{ get; set; }
+        public bool App3{ get; set; }
+        public bool App4{ get; set; }
+        public bool App5{ get; set; }
+        public bool App6{ get; set; }
+        public bool App7{ get; set; }
+        public bool App8{ get; set; }
+        public bool App9{ get; set; }
+        public bool App10{ get; set; }
+        public bool App11{ get; set; }
+        public bool App12{ get; set; }
+        public bool App13{ get; set; }
+        public bool App14{ get; set; }
+        public bool App15{ get; set; }
+        public bool App16{ get; set; }
+        public bool App17{ get; set; }
+        public bool App18{ get; set; }
+        public bool App19{ get; set; }
+        public bool App20{ get; set; }
+
+    }
 }
