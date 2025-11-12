@@ -1,5 +1,6 @@
 @page "/"
 @using Monarch.Models
+@using System.Data.SqlClient
 @rendermode InteractiveServer
 
 <PageTitle>Monarch</PageTitle>
@@ -16,17 +17,28 @@
         </div>
     </header>
 
-    <div class="applications-grid">
-        @foreach (var app in applications)
-        {
-            <div class="@($"app-item {(draggingId == app.Id ? "dragging" : string.Empty)} {(dragOverId == app.Id ? "drag-over" : string.Empty)}")"
-                draggable="true" @ondragstart="@(() => OnDragStart(app.Id))" @ondragover:preventDefault="true"
-                @ondragover="@(() => OnDragOver(app.Id))" @ondrop="@(() => OnDrop(app.Id))" @ondragend="OnDragEnd"
-                @key="app.Id">
-                <ApplicationTile Application="app" />
-            </div>
-        }
-    </div>
+    @if (isLoading)
+    {
+        <div class="loading">Loading applications...</div>
+    }
+    else if (!applications.Any())
+    {
+        <div class="no-data">No applications found. Waiting for data...</div>
+    }
+    else
+    {
+        <div class="applications-grid">
+            @foreach (var app in applications)
+            {
+                <div class="@($"app-item {(draggingId == app.Id ? "dragging" : string.Empty)} {(dragOverId == app.Id ? "drag-over" : string.Empty)}")"
+                    draggable="true" @ondragstart="@(() => OnDragStart(app.Id))" @ondragover:preventDefault="true"
+                    @ondragover="@(() => OnDragOver(app.Id))" @ondrop="@(() => OnDrop(app.Id))" @ondragend="OnDragEnd"
+                    @key="app.Id">
+                    <ApplicationTile Application="app" />
+                </div>
+            }
+        </div>
+    }
 </div>
 
 @code {
@@ -35,25 +47,75 @@
     private string selectedSort = "status";
     private string? draggingId;
     private string? dragOverId;
+    private bool isLoading = true;
+    private System.Threading.Timer? refreshTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadApplicationsFromDatabase();
+        
+        // Refresh data every 30 seconds to see live updates
+        refreshTimer = new System.Threading.Timer(async _ =>
+        {
+            await LoadApplicationsFromDatabase();
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+    }
+
+    private async Task LoadApplicationsFromDatabase()
+    {
+        try
+        {
+            var password = System.IO.File.ReadAllText("/run/secrets/monarch_sql_monarch_password");
+            var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monarch;Password={password};TrustServerCertificate=True;";
+            
+            var apps = new List<ApplicationStatus>();
+            
+            using (var connection = new SqlConnection(connectionString))
+            {
+                await connection.OpenAsync();
+                var cmd = new SqlCommand("SELECT appId, appName, status FROM newRelicApps ORDER BY appName", connection);
+                
+                using (var reader = await cmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        var statusString = reader.GetString(2);
+                        var statusType = statusString switch
+                        {
+                            "Operational" => StatusType.Operational,
+                            "Degraded" => StatusType.DegradedPerformance,
+                            "Down" => StatusType.Outage,
+                            _ => StatusType.Unknown
+                        };
+                        
+                        apps.Add(new ApplicationStatus
+                        {
+                            Id = reader.GetString(0),
+                            Name = reader.GetString(1),
+                            Status = statusType
+                        });
+                    }
+                }
+            }
+            
+            allApplications = apps;
+            ApplySort();
+            isLoading = false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading applications: {ex.Message}");
+            // Fallback to empty list
+            allApplications = new List<ApplicationStatus>();
+            applications = new List<ApplicationStatus>();
+            isLoading = false;
+        }
+    }
 
     protected override void OnInitialized()
     {
-        // Mock data matching the Figma layout
-        allApplications = Enumerable.Range(1, 20)
-        .Select(i => new ApplicationStatus
-        {
-            Id = i.ToString(),
-            Name = $"Application {i}",
-            Status = i switch
-            {
-                <= 15 => StatusType.Operational,
-                <= 17 => StatusType.DegradedPerformance,
-                _ => StatusType.Outage
-            }
-        })
-        .ToList();
-
-        ApplySort();
+        // Removed - now using OnInitializedAsync with database
     }
 
     private void OnSortChanged(ChangeEventArgs e)
@@ -132,6 +194,11 @@
         dragOverId = null;
         StateHasChanged();
     }
+
+    public void Dispose()
+    {
+        refreshTimer?.Dispose();
+    }
 }
 
 <style>
@@ -192,5 +259,14 @@
         border-radius: 6px;
         font-family: 'Oswald', sans-serif;
         font-size: 14px;
+    }
+
+    .loading,
+    .no-data {
+        color: #A0A0A0;
+        text-align: center;
+        padding: 48px;
+        font-size: 18px;
+        font-family: 'Oswald', sans-serif;
     }
 </style>

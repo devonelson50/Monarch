@@ -19,7 +19,7 @@ public class Worker : BackgroundService
         {
             Console.WriteLine($"{DateTime.Now:HH:mm:ss} - Refreshing NewRelic data");
             nrs.RunLoop();
-            await Task.Delay(5000, stoppingToken);
+            await Task.Delay(30000, stoppingToken);
         }
     }
 }
