@@ -36,24 +36,22 @@
     private string? draggingId;
     private string? dragOverId;
 
-    protected override void OnInitialized()
-    {
+    protected override void OnInitialized(){
         // Mock data matching the Figma layout
         allApplications = Enumerable.Range(1, 20)
-        .Select(i => new ApplicationStatus
-        {
-            Id = i.ToString(),
-            Name = $"Application {i}",
-            Status = i switch
+            .Select(i => new ApplicationStatus
             {
-                <= 15 => StatusType.Operational,
-                <= 17 => StatusType.DegradedPerformance,
-                _ => StatusType.Outage
-            }
-        })
-        .ToList();
-
-        ApplySort();
+                Id = i.ToString(),
+                Name = $"Application {i}",
+                Status = i switch
+                {
+                    <= 15 => StatusType.Operational,
+                    <= 17 => StatusType.DegradedPerformance,
+                    _ => StatusType.Outage
+                }
+            })
+            .ToList();
+            ApplySort();
     }
 
     private void OnSortChanged(ChangeEventArgs e)
