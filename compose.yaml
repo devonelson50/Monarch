@@ -6,12 +6,6 @@ services:
     build:
       context: .
       dockerfile: app/src/Monarch/Dockerfile
-    environment:
-      OIDC_IDP_ADDRESS_FOR_SERVER: "http://keycloak:8080/realms/monarch"
-      OIDC_IDP_ADDRESS_FOR_CLIENT: "http://localhost/realms/monarch"
-      OIDC_CLIENT_ID: "monarch-client"
-      OIDC_REQUIRE_HTTPS_METADATA: "false"
-      HTTPCLIENT_VALIDATE_EXTERNAL_CERTIFICATE: "false"
     ports:
       - 8080:8080
     depends_on:
@@ -19,6 +13,7 @@ services:
         condition: service_healthy
     secrets:
       - monarch_sql_monarch_password
+      - monarch_oidc_client_secret
   monapi-worker:
     image: monapi-worker
     build:
@@ -68,7 +63,7 @@ services:
     entrypoint: /bin/bash
     command: -c "export KC_DB_PASSWORD=$(cat /run/secrets/monarch_sql_keycloak_password) && /opt/keycloak/bin/kc.sh import --file /opt/keycloak/data/import/realm.json && /opt/keycloak/bin/kc.sh start-dev"
     ports:
-      - 80:8080
+      - 8081:8080
     volumes:
       - ./keycloak/realm.json:/opt/keycloak/data/import/realm.json
     depends_on:
@@ -103,3 +98,6 @@ secrets:
   monarch_slack_webhooks:
     # external: true
     file: ./.credentials/slack_webhooks.json # development only
+  monarch_oidc_client_secret:
+    # external: true
+    file: ./.credentials/oidc_client_secret.txt # development only
