@@ -13,6 +13,7 @@ services:
         condition: service_healthy
     secrets:
       - monarch_sql_monarch_password
+      - monarch_oidc_client_secret
   monapi-worker:
     image: monapi-worker
     build:
@@ -49,6 +50,27 @@ services:
       - monarch_sql_sa_password
       - monarch_sql_monarch_password
       - monarch_sql_monapi_password
+      - monarch_sql_keycloak_password
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    environment:
+      KC_DB: mssql
+      KC_DB_URL: jdbc:sqlserver://sqlserver:1433;databaseName=keycloak;encrypt=false;trustServerCertificate=true;
+      KC_DB_USERNAME: keycloak
+      KC_HTTP_ENABLED: 'true'
+      KC_PROXY: 'edge' 
+      KC_HOSTNAME_STRICT: 'false'
+    entrypoint: /bin/bash
+    command: -c "export KC_DB_PASSWORD=$(cat /run/secrets/monarch_sql_keycloak_password) && /opt/keycloak/bin/kc.sh import --file /opt/keycloak/data/import/realm.json && /opt/keycloak/bin/kc.sh start-dev"
+    ports:
+      - 8081:8080
+    volumes:
+      - ./keycloak/realm.json:/opt/keycloak/data/import/realm.json
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    secrets:
+      - monarch_sql_keycloak_password
 volumes:
   sqlserverdata:
 secrets:
@@ -61,6 +83,9 @@ secrets:
   monarch_sql_monapi_password:
     # external: true
     file: ./.credentials/sql_monapi_password.txt # development only
+  monarch_sql_keycloak_password:
+    # external: true
+    file: ./.credentials/sql_keycloak_password.txt # development only
   monarch_newrelic_api_key:
     # external: true
     file: ./.credentials/newrelic_api_key.txt # development only
@@ -73,3 +98,6 @@ secrets:
   monarch_slack_webhooks:
     # external: true
     file: ./.credentials/slack_webhooks.json # development only
+  monarch_oidc_client_secret:
+    # external: true
+    file: ./.credentials/oidc_client_secret.txt # development only

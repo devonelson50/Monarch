@@ -4,6 +4,7 @@ echo "Running initdb.sh."
 SA_PATH="/run/secrets/monarch_sql_sa_password"
 MONARCH_PATH="/run/secrets/monarch_sql_monarch_password"
 MONAPI_PATH="/run/secrets/monarch_sql_monapi_password"
+KEYCLOAK_PATH="/run/secrets/monarch_sql_keycloak_password"
 if [ -f "$SA_PATH" ]; then
     SA_PASSWORD=$(cat $SA_PATH)
 else
@@ -23,6 +24,13 @@ if [ -f "$MONAPI_PATH" ]; then
 else
     echo "Monapi file not found. Exiting."
     exit 4
+fi
+
+if [ -f "$KEYCLOAK_PATH" ]; then
+    KEYCLOAK_PASSWORD=$(cat $KEYCLOAK_PATH)
+else
+    echo "Keycloak file not found. Exiting."
+    exit 5
 fi
 
 #export ODBC_TLS_VER=TLSv1.2
@@ -58,7 +66,8 @@ echo "SQL Server is started. Running setup.sql."
     -d master \
     -i /usr/config/setup.sql \
     -v MONARCH_PASSWORD="$MONARCH_PASSWORD" \
-    -v MONAPI_PASSWORD="$MONAPI_PASSWORD"
+    -v MONAPI_PASSWORD="$MONAPI_PASSWORD" \
+    -v KEYCLOAK_PASSWORD="$KEYCLOAK_PASSWORD"
 
 echo "Initialization complete. Exiting script."
 wait $SQL_PID

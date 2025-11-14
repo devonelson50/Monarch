@@ -345,11 +345,11 @@ public class NewRelicSimulator
     private String PickStatus()
     {
         int roll = (new Random()).Next(100);
-        if (roll < 80)
+        if (roll < 95)
         {
             return "Operational";
         }
-        if (roll < 95)
+        if (roll < 98)
         {
             return "Degraded";
         }
