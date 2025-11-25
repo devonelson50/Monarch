@@ -5,6 +5,8 @@ using RestSharp;
 namespace Monapi.Worker.Nagios;
 
 /// <summary>
+/// Devon Nelson
+/// 
 /// Retrieve and abstract Nagios data, insert into monapi database.
 /// </summary>
 public class NagiosConnector

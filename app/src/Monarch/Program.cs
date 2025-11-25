@@ -7,6 +7,13 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.AspNetCore.Antiforgery;
 
+/// Devon Nelson
+/// Blazor WebApp entrypoint accomplishes the following:
+///     - Injest OIDC configuration from appsettings.json
+///     - Forward unauthenticated clients to KeyCloak for authentication
+///     - Complete OIDC user authorization flow
+///     - Begin the authenticated user's session
+
 var builder = WebApplication.CreateBuilder(args);
 
 var keycloakConfig = builder.Configuration.GetSection("Keycloak");

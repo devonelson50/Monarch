@@ -4,6 +4,14 @@ using RestSharp;
 
 namespace Monapi.Worker.NewRelic;
 
+/// <summary>
+/// Devon Nelson
+///
+/// Connect to New Relic API, retrieve an up to date application list,
+/// and write it to the database.
+/// </summary>
+
+
 public class NewRelicConnector
 {
     private readonly String apiKey;
@@ -79,7 +87,7 @@ public class NewRelicConnector
             // Delete existing data
             // This implementation causes a brief window where the database is not fully refreshed.
             // A UI update during this window may display few or no apps.
-            var query = "DELETE FROM newRelicApps"; 
+            var query = "DELETE FROM newRelicApps";
             using (var command = new SqlCommand(query, connection))
             {
                 await command.ExecuteNonQueryAsync();

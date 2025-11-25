@@ -1,6 +1,10 @@
 using Monapi.Worker;
 
 namespace Monapi.Worker;
+/// <summary>
+/// Primary loop for the service worker. For prototyping purposes, it should
+/// refresh simulated New Relic data from NewRelicSimulator every 30 seconds
+/// </summary>
 
 public class Worker : BackgroundService
 {
