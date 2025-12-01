@@ -2,7 +2,7 @@ using Monapi.Worker;
 
 namespace Monapi.Worker;
 /// <summary>
-/// Primary loop for the service worker. For prototyping purposes, it should
+/// Primary loop for the service worker. For prototyping purposes, it will
 /// refresh simulated New Relic data from NewRelicSimulator every 30 seconds
 /// </summary>
 

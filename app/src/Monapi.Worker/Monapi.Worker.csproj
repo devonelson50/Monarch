@@ -1,3 +1,7 @@
+<!-- Devon Nelson -->
+<!-- Initial file automatically generated during project creation -->
+<!-- Modified to included additional dependencies -->
+<!-- This acts as the basis for the .NET project that will be included in the image defined in Dockerfile -->
 <Project Sdk="Microsoft.NET.Sdk.Worker">
 
   <PropertyGroup>
