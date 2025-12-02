@@ -1,4 +1,24 @@
-# Please refer https://aka.ms/HTTPSinContainer on how to setup an https developer certificate for your ASP.NET Core service.
+# Devon Nelson
+#
+# Docker Compose file defining complete container stack:
+#   - monarch (Blazor WebApp container)
+#   - monapi-worker (Async service worker)
+#   - sqlserver (Microsoft SQL Server container)
+#   - keycloak (KeyCloak)
+#
+# The compose includes:
+#   - Images and build contexts
+#   - Port exposure definitions
+#   - Persistent volume attachment
+#       - SQL databases
+#       - KeyCloak realm configuration
+#       - Initialization scripts
+#   - Secrets management via Docker Secrets
+#       - text files are used for testing and development, these have been included in
+#         .gitignnore
+#       - In production, external flags will be set to allow secure secret injection
+#   - Service health checks to prevent premature database calls
+#   - Environment variables
 
 services:
   monarch:

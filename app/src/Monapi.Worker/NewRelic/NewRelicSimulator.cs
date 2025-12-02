@@ -1,6 +1,8 @@
 namespace Monapi.Worker.NewRelic;
 
 /// <summary>
+/// Devon Nelson
+/// 
 /// This class exists only for prototyping. It creates fake NewRelic data and write it 
 /// to the database using NewRelicConnector.WriteToDatabase(). This class can be safely
 /// deleted once a fully fleged simulator is implemented to test NewRelicConnector.GetApps().

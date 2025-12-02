@@ -1,3 +1,18 @@
+-- Devon Nelson
+--
+-- SQL script to automate database initialization. This script will create all necessary
+-- databases, database users, logins, and tables. Configuration follows least privilege. 
+-- This script can safely handle setting up a fresh database on first execution, or an
+-- existing volume. If an existing database volume is attached, logins are deleted and 
+-- recreated to ensure permissions are still as expected, and to ingest any modifications
+-- to service account credentials.
+--
+-- Information is split into 3 separate logical databases, all hosted by the same container.
+--      - KeyCloak requires a separate database as it handles its own automatic setup
+--      - monarch and monapi tables are separated to minimize the database-level access from
+--        each container. This allows permissions to be managed across all tables at a database
+--        level, rather than applying different permissions per table.
+
 -- Create monarch databases
 IF DB_ID('monarch') IS NULL
 BEGIN

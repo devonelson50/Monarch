@@ -1,4 +1,16 @@
 #!/bin/bash
+
+# Devon Nelson
+# 
+# Microsoft SQL Server container entrypoint script.
+#
+# This script will:
+#       - retrieve any credentials passed via Docker Secrets.
+#       - Call the sqlservr service in the background
+#       - await the sqlservr service
+#       - Connect to SQL server, and execute setup.sql
+#       - wait the sqlservr service's PID to keep the container running
+
 echo "Running initdb.sh."
 
 SA_PATH="/run/secrets/monarch_sql_sa_password"
