@@ -1,3 +1,10 @@
+@*
+Conner Hammonds
+Monarch Application Tile Component
+ - Displays individual application status tiles
+ - Expandable to show more details
+*@
+
 @using Monarch.Models
 
 <div class="app-tile @GetStatusClass() @(IsExpanded ? "expanded" : string.Empty)">
@@ -5,9 +12,11 @@
         <span class="app-name">@Application.ResourceName</span>
         <div class="status-indicator">
             <span class="status-dot"></span>
-            <button class="expand-btn" title="Expand" aria-label="Expand" aria-expanded="@IsExpanded" @onclick="ExpandAsync">
+            <button class="expand-btn" title="Expand" aria-label="Expand" aria-expanded="@IsExpanded"
+                @onclick="ExpandAsync">
                 <svg class="expand-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                    <path fill="currentColor" d="M7 3H3v4h2V5h2V3zm12 0h-4v2h2v2h2V3zM5 17H3v4h4v-2H5v-2zm14 0h-2v2h-2v2h4v-4z" />
+                    <path fill="currentColor"
+                        d="M7 3H3v4h2V5h2V3zm12 0h-4v2h2v2h2V3zM5 17H3v4h4v-2H5v-2zm14 0h-2v2h-2v2h4v-4z" />
                 </svg>
             </button>
         </div>
@@ -20,17 +29,23 @@
                 <div class="metric">
                     <span class="label">Uptime</span>
                     <span class="value">99.9%</span>
-                    <div class="bar"><div class="fill" style="width: 99.9%"></div></div>
+                    <div class="bar">
+                        <div class="fill" style="width: 99.9%"></div>
+                    </div>
                 </div>
                 <div class="metric">
                     <span class="label">Response</span>
                     <span class="value">120 ms</span>
-                    <div class="bar"><div class="fill yellow" style="width: 60%"></div></div>
+                    <div class="bar">
+                        <div class="fill yellow" style="width: 60%"></div>
+                    </div>
                 </div>
                 <div class="metric">
                     <span class="label">Error Rate</span>
                     <span class="value">0.7%</span>
-                    <div class="bar"><div class="fill red" style="width: 7%"></div></div>
+                    <div class="bar">
+                        <div class="fill red" style="width: 7%"></div>
+                    </div>
                 </div>
                 <div class="metric-row">
                     <span class="label">Last Checked</span>
@@ -145,8 +160,8 @@
 
     .details {
         margin-top: 12px;
-        background: rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.08);
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 8px;
         padding: 12px;
         width: 100%;
@@ -160,6 +175,7 @@
             transform: scaleY(0);
             max-height: 0;
         }
+
         to {
             opacity: 1;
             transform: scaleY(1);
@@ -173,13 +189,15 @@
         gap: 10px 16px;
     }
 
-    .metric, .metric-row {
+    .metric,
+    .metric-row {
         display: flex;
         flex-direction: column;
         gap: 6px;
     }
 
-    .metric .label, .metric-row .label {
+    .metric .label,
+    .metric-row .label {
         font-size: 12px;
         color: #BDBDBD;
     }
@@ -198,13 +216,14 @@
     .bar {
         height: 6px;
         border-radius: 4px;
-        background: rgba(255,255,255,0.12);
+        background: rgba(255, 255, 255, 0.12);
         overflow: hidden;
     }
 
     .bar .fill {
         height: 100%;
-        background: #4CAF50; /* green */
+        background: #4CAF50;
+        /* green */
     }
 
     .bar .fill.yellow {

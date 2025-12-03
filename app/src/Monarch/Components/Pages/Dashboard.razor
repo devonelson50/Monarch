@@ -1,3 +1,11 @@
+@*
+Conner Hammonds
+Monarch Dashboard Page
+ - Displays a list of applications with their statuses,
+ - Allows sorting by status or alphabetically
+ - Styles the page based on the Figma Mockup
+*@
+
 @page "/"
 @using Monarch.Models
 @using System.Data.SqlClient
@@ -53,7 +61,7 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadApplicationsFromDatabase();
-        
+
         // Refresh data every 30 seconds to see live updates
         refreshTimer = new System.Threading.Timer(async _ =>
         {
@@ -68,14 +76,14 @@
         {
             var password = System.IO.File.ReadAllText("/run/secrets/monarch_sql_monarch_password");
             var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monarch;Password={password};TrustServerCertificate=True;";
-            
+
             var apps = new List<ApplicationStatus>();
-            
+
             using (var connection = new SqlConnection(connectionString))
             {
                 await connection.OpenAsync();
                 var cmd = new SqlCommand("SELECT appId, appName, status FROM newRelicApps ORDER BY appName", connection);
-                
+
                 using (var reader = await cmd.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
@@ -88,7 +96,7 @@
                             "Down" => StatusType.Outage,
                             _ => StatusType.Unknown
                         };
-                        
+
                         apps.Add(new ApplicationStatus
                         {
                             Id = reader.GetString(0),
@@ -98,7 +106,7 @@
                     }
                 }
             }
-            
+
             allApplications = apps;
             ApplySort();
             isLoading = false;
