@@ -150,7 +150,29 @@ BEGIN
 END
 GO
 
--- Nagios TBD
+IF OBJECT_ID('nagiosApps', 'U') IS NULL
+BEGIN
+    CREATE TABLE nagiosApps (
+        hostObjectId INT PRIMARY KEY,
+        hostName VARCHAR(255),
+        displayName VARCHAR(255),
+        ipAddress VARCHAR(64),
+        statusUpdateTime DATETIME,
+        output VARCHAR(255),
+        perfData VARCHAR(255),
+        currentState INT,
+        lastCheck DATETIME,
+        lastStateChange DATETIME,
+        lastTimeUp DATETIME,
+        lastTimeDown DATETIME,
+        lastTimeUnreachable DATETIME,
+        lastNotification DATETIME,
+        latency VARCHAR(255)
+    );
+END
+GO
+
+-- Nagios Incidents TBD
 
 IF OBJECT_ID('jira', 'U') IS NULL
 BEGIN
