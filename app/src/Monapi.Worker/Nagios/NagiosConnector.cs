@@ -7,111 +7,105 @@ namespace Monapi.Worker.Nagios;
 /// <summary>
 /// Devon Nelson
 /// 
-/// Retrieve and abstract Nagios data, insert into monapi database.
+/// Retrieve  Nagios data, insert into monapi database.
 /// </summary>
 public class NagiosConnector
 {
-
-    private readonly JsonNode nagiosApiDetails;
+    private readonly String nagiosApiKey;
     private readonly String monapiKey;
+    private readonly String nagiosRequestUri;
 
+    /// <summary>
+    /// Constructor includes prep work that only needs to run once each time the monapi
+    /// container starts.
+    /// </summary>
+    /// <exception cref="Exception"></exception>
     public NagiosConnector()
     {
-        this.nagiosApiDetails = JsonNode.Parse(File.ReadAllText("/run/secrets/monarch_nagios_api_details"));
+        this.nagiosApiKey = File.ReadAllText("/run/secrets/monarch_nagios_api_details");
         this.monapiKey = File.ReadAllText("/run/secrets/monarch_sql_monapi_password");
+        this.nagiosRequestUri = Environment.GetEnvironmentVariable("nagios_uri") ?? "";
+        if (string.IsNullOrWhiteSpace(this.nagiosRequestUri))
+        {
+            throw new Exception("'nagios_uri' not set in Environment Variables.");
+        }
+        this.nagiosRequestUri += "api/v1/objects/hoststatus?apikey=" + this.nagiosApiKey;
     }
-    
+
     /// <summary>
-    /// Complete a connector loop
+    /// Modifies the SqlCommand object to include data from REST API call. 
+    /// This helper function exists to make RunConnector() easier to follow, and to
+    /// potentially help avoid duplicate code blocks depending on future changes to
+    /// RunConnector().
+    /// </summary>
+    /// <param name="command"></param>
+    /// <param name="app"></param>
+    private void AddQueryParameters(SqlCommand command, JsonNode app)
+    {
+        command.Parameters.AddWithValue("@hostObjectId", int.Parse(app["host_object_id"]?.ToString() ?? "0"));
+        command.Parameters.AddWithValue("@currentState", int.Parse(app["current_state"]?.ToString() ?? "0"));
+        command.Parameters.AddWithValue("@hostName", app["host_name"]?.GetValue<string>() ?? "");
+        command.Parameters.AddWithValue("@displayName", app["display_name"]?.GetValue<string>() ?? "");
+        command.Parameters.AddWithValue("@ipAddress", app["address"]?.GetValue<string>() ?? "");
+        command.Parameters.AddWithValue("@output", app["output"]?.GetValue<string>() ?? "");
+        command.Parameters.AddWithValue("@perfData", app["perf_data"]?.GetValue<string>() ?? "");
+        command.Parameters.AddWithValue("@latency", app["latency"]?.ToString() ?? "0");
+        command.Parameters.AddWithValue("@statusUpdateTime", DateTime.Parse(app["status_update_time"]?.ToString() ?? DateTime.MinValue.ToString()));
+        command.Parameters.AddWithValue("@lastCheck", DateTime.Parse(app["last_check"]?.ToString() ?? DateTime.MinValue.ToString()));
+        command.Parameters.AddWithValue("@lastStateChange", DateTime.Parse(app["last_state_change"]?.ToString() ?? DateTime.MinValue.ToString()));
+        command.Parameters.AddWithValue("@lastTimeUp", DateTime.Parse(app["last_time_up"]?.ToString() ?? DateTime.MinValue.ToString()));
+        command.Parameters.AddWithValue("@lastTimeDown", DateTime.Parse(app["last_time_down"]?.ToString() ?? DateTime.MinValue.ToString()));
+        command.Parameters.AddWithValue("@lastTimeUnreachable", DateTime.Parse(app["last_time_unreachable"]?.ToString() ?? DateTime.MinValue.ToString()));
+        command.Parameters.AddWithValue("@lastNotification", DateTime.Parse(app["last_notification"]?.ToString() ?? DateTime.MinValue.ToString()));
+    }
+
+    /// <summary>
+    /// NagiosConnector's primary loop. This function makes an API call to the configured nagiosxi host, pulls hoststatus data,
+    /// and writes to the monapi.nagiosApps table.
     /// </summary>
     /// <returns></returns>
+    /// <exception cref="Exception"></exception>
     public async Task RunConnector()
     {
-        List<NagiosApp> apps = await GetApps();
-        await this.WriteToDatabase(apps);
-    }
-
-    /// <summary>
-    /// Retrieves list of nagios applications from nagios API
-    /// </summary>
-    /// <returns>Dynamic list of abstracted applications</returns>
-    /// <exception cref="Exception"></exception>
-    private async Task<List<NagiosApp>> GetApps()
-    {
-        var apps = new List<NagiosApp>();
-        var uri = BuildConnectionString(); // parse key and hostname JsonNode
-
-        var options = new RestClientOptions(uri);
-        var client = new RestClient(options);
-        var request = new RestRequest();
-        var response = await client.ExecuteAsync(request);
-
+        // API Request
+        var client = new RestClient(new RestClientOptions(this.nagiosRequestUri));
+        var response = await client.ExecuteAsync(new RestRequest());
         if (!(response.IsSuccessful))
         {
             throw new Exception("API request failed.");
         }
-        else
+
+        // SQL
+        //
+        // Attempt to update an existing line, if no changes are made by the update query, prepare an insert query.
+        // This replaces the prototype's logic, which would delete all rows and re-insert, causing very short periods of time
+        // in which the table would be empty or re-populating. 
+        await using (var sqlConnection = new SqlConnection($"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={monapiKey};TrustServerCertificate=True;"))
         {
+            await sqlConnection.OpenAsync();
             JsonNode jNode = JsonNode.Parse(response.Content);
-            foreach (var app in jNode["hoststatus"].AsArray())
+            var hostList = jNode["hoststatus"]?.AsArray();
+            if (hostList == null)
             {
-                apps.Add(new NagiosApp
-                {
-                    AppId = app["host_id"].ToString(),
-                    AppName = app["host_name"].ToString(),
-                    Status = app["current_state"].ToString()
-                });
+                Console.WriteLine("WARN: Host list is empty!");
             }
-        }
-        return apps;
-    }
-    /// <summary>
-    /// Writes application list to monapi database
-    /// </summary>
-    /// <param name="apps">Dynamic list of NagiosApp objects</param>
-    /// <returns></returns>
-    private async Task WriteToDatabase(List<NagiosApp> apps)
-    {
-        var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={monapiKey};TrustServerCertificate=True;";
-        using (var connection = new SqlConnection(connectionString))
-        {
-            await connection.OpenAsync();
-            foreach (NagiosApp app in apps)
+            foreach (var app in hostList)
             {
-                var query = "INSERT INTO nagiosApps (appId, appName, status) VALUES (@appId, @appName, @status)";
-                using (var command = new SqlCommand(query, connection))
+                int rowsUpdated = 0;
+                var updateQuery = "UPDATE nagiosApps SET hostName=@hostName, displayName=@displayName, ipAddress=@ipAddress, statusUpdateTime=@statusUpdateTime, output=@output, perfData=@perfData, currentState=@currentState, lastCheck=@lastCheck, lastStateChange=@lastStateChange, lastTimeUp=@lastTimeUp, lastTimeDown=@lastTimeDown, lastTimeUnreachable=@lastTimeUnreachable, lastNotification=@lastNotification, latency=@latency WHERE hostObjectId=@hostObjectId";
+
+                await using (var command = new SqlCommand(updateQuery, sqlConnection))
                 {
-                    command.Parameters.AddWithValue("@appId", app.AppId);
-                    command.Parameters.AddWithValue("@appName", app.AppName);
-                    command.Parameters.AddWithValue("@status", app.Status);
-                    await command.ExecuteNonQueryAsync();
+                    AddQueryParameters(command, app);
+                    rowsUpdated = await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+                    if (rowsUpdated == 0)
+                    {
+                        command.CommandText = "INSERT INTO nagiosApps (hostObjectId, hostName, displayName, ipAddress, statusUpdateTime, output, perfData, currentState, lastCheck, lastStateChange, lastTimeUp, lastTimeDown, lastTimeUnreachable, lastNotification, latency) VALUES (@hostObjectId, @hostName, @displayName, @ipAddress, @statusUpdateTime, @output, @perfData, @currentState, @lastCheck, @lastStateChange, @lastTimeUp, @lastTimeDown, @lastTimeUnreachable, @lastNotification, @latency)";
+                        await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+                    }
                 }
+
             }
         }
-    }
-
-    /// <summary>
-    /// Builds the uri using details parsed from JsonNode secret data
-    /// </summary>
-    /// <returns>Uri as string</returns>
-    private string BuildConnectionString()
-    {
-        // NOTE: Parsed JsonNode structure allows non-standard port declaration.
-        // Non-standard port can be added to the hostname value. i.e. "nagios.interstatestudio.com:123"
-        var uri = "";
-        if (this.nagiosApiDetails["TLS"].ToString().ToLower() == "true")
-        {
-            uri += "https://";
-        }
-        else
-        {
-            uri += "http://";
-        }
-        uri += this.nagiosApiDetails["Hostname"].ToString();
-        uri += "/nagiosxi/api/v1/objects/hoststatus?apikey=";
-        uri += this.nagiosApiDetails["ApiKey"].ToString();
-        uri += "&pretty=1";
-
-        return uri;
     }
 }

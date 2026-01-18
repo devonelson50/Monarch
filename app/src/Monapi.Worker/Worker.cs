@@ -18,13 +18,18 @@ public class Worker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        Nagios.NagiosConnector nc = new Nagios.NagiosConnector();
         NewRelic.NewRelicSimulator nrs = new NewRelic.NewRelicSimulator();
-
+        
         while (!stoppingToken.IsCancellationRequested)
         {
             Console.WriteLine($"{DateTime.Now:HH:mm:ss} - Refreshing NewRelic data");
             nrs.RunLoop();
+            Console.WriteLine($"{DateTime.Now:HH:mm:ss} - Refreshing Nagios data");
+            nc.RunConnector();
             await Task.Delay(30000, stoppingToken);
         }
+
+        
     }
 }
