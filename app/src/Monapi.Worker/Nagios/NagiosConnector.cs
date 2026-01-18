@@ -1,7 +1,5 @@
-using System.Data.SqlTypes;
 using System.Text.Json.Nodes;
 using Microsoft.Data.SqlClient;
-using Microsoft.VisualBasic;
 using RestSharp;
 
 namespace Monapi.Worker.Nagios;
@@ -17,18 +15,31 @@ public class NagiosConnector
     private readonly String monapiKey;
     private readonly String nagiosRequestUri;
 
+    /// <summary>
+    /// Constructor includes prep work that only needs to run once each time the monapi
+    /// container starts.
+    /// </summary>
+    /// <exception cref="Exception"></exception>
     public NagiosConnector()
     {
         this.nagiosApiKey = File.ReadAllText("/run/secrets/monarch_nagios_api_details");
         this.monapiKey = File.ReadAllText("/run/secrets/monarch_sql_monapi_password");
-        this.nagiosRequestUri = Environment.GetEnvironmentVariable("nagios_uri");
-        if (string.IsNullOrWhiteSpace(nagiosRequestUri))
+        this.nagiosRequestUri = Environment.GetEnvironmentVariable("nagios_uri") ?? "";
+        if (string.IsNullOrWhiteSpace(this.nagiosRequestUri))
         {
             throw new Exception("'nagios_uri' not set in Environment Variables.");
         }
         this.nagiosRequestUri += "api/v1/objects/hoststatus?apikey=" + this.nagiosApiKey;
     }
 
+    /// <summary>
+    /// Modifies the SqlCommand object to include data from REST API call. 
+    /// This helper function exists to make RunConnector() easier to follow, and to
+    /// potentially help avoid duplicate code blocks depending on future changes to
+    /// RunConnector().
+    /// </summary>
+    /// <param name="command"></param>
+    /// <param name="app"></param>
     private void AddQueryParameters(SqlCommand command, JsonNode app)
     {
         command.Parameters.AddWithValue("@hostObjectId", int.Parse(app["host_object_id"]?.ToString() ?? "0"));
@@ -48,6 +59,12 @@ public class NagiosConnector
         command.Parameters.AddWithValue("@lastNotification", DateTime.Parse(app["last_notification"]?.ToString() ?? DateTime.MinValue.ToString()));
     }
 
+    /// <summary>
+    /// NagiosConnector's primary loop. This function makes an API call to the configured nagiosxi host, pulls hoststatus data,
+    /// and writes to the monapi.nagiosApps table.
+    /// </summary>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
     public async Task RunConnector()
     {
         // API Request
@@ -59,12 +76,17 @@ public class NagiosConnector
         }
 
         // SQL
-        await using(var sqlConnection = new SqlConnection($"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={monapiKey};TrustServerCertificate=True;"))
+        //
+        // Attempt to update an existing line, if no changes are made by the update query, prepare an insert query.
+        // This replaces the prototype's logic, which would delete all rows and re-insert, causing very short periods of time
+        // in which the table would be empty or re-populating. 
+        await using (var sqlConnection = new SqlConnection($"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={monapiKey};TrustServerCertificate=True;"))
         {
             await sqlConnection.OpenAsync();
             JsonNode jNode = JsonNode.Parse(response.Content);
             var hostList = jNode["hoststatus"]?.AsArray();
-            if(hostList == null){
+            if (hostList == null)
+            {
                 Console.WriteLine("WARN: Host list is empty!");
             }
             foreach (var app in hostList)
