@@ -1,0 +1,327 @@
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using RestSharp;
+
+namespace Monapi.Worker.Jira;
+
+/// <summary>
+/// Handles direct communication with Jira REST API
+/// Manages authentication, request formatting, and response parsing
+/// </summary>
+public class JiraConnector
+{
+    private readonly string _baseUrl;
+    private readonly string _projectKey;
+    private readonly string _issueType;
+    private readonly string _authHeader;
+
+    public JiraConnector(string baseUrl, string projectKey, string issueType, string emailAndToken)
+    {
+        _baseUrl = baseUrl.TrimEnd('/');
+        _projectKey = projectKey;
+        _issueType = issueType;
+        
+        // Create Basic Auth header from email:token format
+        var base64Credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes(emailAndToken));
+        _authHeader = $"Basic {base64Credentials}";
+    }
+
+    /// <summary>
+    /// Creates a new Jira issue for an incident
+    /// </summary>
+    /// <param name="summary">Brief title of the issue</param>
+    /// <param name="description">Detailed description of the incident</param>
+    /// <param name="priority">Priority level (High/Medium/Low)</param>
+    /// <returns>Created JiraTicket object with issue key and metadata</returns>
+    public async Task<JiraTicket?> CreateIssue(string summary, string description, string priority = "Medium")
+    {
+        try
+        {
+            var url = $"{_baseUrl}/rest/api/3/issue";
+            var options = new RestClientOptions(url);
+            var client = new RestClient(options);
+            var request = new RestRequest();
+
+            request.AddHeader("Authorization", _authHeader);
+            request.AddHeader("Content-Type", "application/json");
+            request.AddHeader("Accept", "application/json");
+
+            // Build the Jira issue payload
+            var payload = new
+            {
+                fields = new
+                {
+                    project = new { key = _projectKey },
+                    summary = summary,
+                    description = new
+                    {
+                        type = "doc",
+                        version = 1,
+                        content = new[]
+                        {
+                            new
+                            {
+                                type = "paragraph",
+                                content = new[]
+                                {
+                                    new
+                                    {
+                                        type = "text",
+                                        text = description
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    issuetype = new { name = _issueType },
+                    priority = new { name = priority }
+                }
+            };
+
+            request.AddJsonBody(payload);
+            var response = await client.PostAsync(request);
+
+            if (!response.IsSuccessful)
+            {
+                Console.WriteLine($"Failed to create Jira issue: {response.StatusCode} - {response.Content}");
+                return null;
+            }
+
+            var jsonResponse = JsonNode.Parse(response.Content!);
+            var issueKey = jsonResponse?["key"]?.ToString();
+            var issueId = jsonResponse?["id"]?.ToString();
+
+            if (string.IsNullOrEmpty(issueKey))
+            {
+                Console.WriteLine("Failed to parse issue key from Jira response");
+                return null;
+            }
+
+            Console.WriteLine($"Successfully created Jira issue: {issueKey}");
+
+            return new JiraTicket
+            {
+                IssueKey = issueKey,
+                IssueId = issueId ?? "",
+                Summary = summary,
+                Description = description,
+                Status = "Open",
+                Priority = priority,
+                WebUrl = $"{_baseUrl}/browse/{issueKey}",
+                CreatedAt = DateTime.UtcNow
+            };
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception creating Jira issue: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Adds a comment to an existing Jira issue
+    /// </summary>
+    /// <param name="issueKey">The Jira issue key (e.g., "MON-123")</param>
+    /// <param name="comment">Comment text to add</param>
+    /// <returns>True if successful</returns>
+    public async Task<bool> AddComment(string issueKey, string comment)
+    {
+        try
+        {
+            var url = $"{_baseUrl}/rest/api/3/issue/{issueKey}/comment";
+            var options = new RestClientOptions(url);
+            var client = new RestClient(options);
+            var request = new RestRequest();
+
+            request.AddHeader("Authorization", _authHeader);
+            request.AddHeader("Content-Type", "application/json");
+            request.AddHeader("Accept", "application/json");
+
+            var payload = new
+            {
+                body = new
+                {
+                    type = "doc",
+                    version = 1,
+                    content = new[]
+                    {
+                        new
+                        {
+                            type = "paragraph",
+                            content = new[]
+                            {
+                                new
+                                {
+                                    type = "text",
+                                    text = comment
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            request.AddJsonBody(payload);
+            var response = await client.PostAsync(request);
+
+            if (response.IsSuccessful)
+            {
+                Console.WriteLine($"Successfully added comment to {issueKey}");
+                return true;
+            }
+
+            Console.WriteLine($"Failed to add comment to {issueKey}: {response.StatusCode}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception adding comment to Jira: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Transitions a Jira issue to a different status (e.g., "Done", "In Progress")
+    /// </summary>
+    /// <param name="issueKey">The Jira issue key</param>
+    /// <param name="transitionName">Name of the transition (e.g., "Done", "Close")</param>
+    /// <returns>True if successful</returns>
+    public async Task<bool> TransitionIssue(string issueKey, string transitionName)
+    {
+        try
+        {
+            // First, get available transitions
+            var transitionId = await GetTransitionId(issueKey, transitionName);
+            if (transitionId == null)
+            {
+                Console.WriteLine($"Transition '{transitionName}' not found for {issueKey}");
+                return false;
+            }
+
+            var url = $"{_baseUrl}/rest/api/3/issue/{issueKey}/transitions";
+            var options = new RestClientOptions(url);
+            var client = new RestClient(options);
+            var request = new RestRequest();
+
+            request.AddHeader("Authorization", _authHeader);
+            request.AddHeader("Content-Type", "application/json");
+
+            var payload = new
+            {
+                transition = new { id = transitionId }
+            };
+
+            request.AddJsonBody(payload);
+            var response = await client.PostAsync(request);
+
+            if (response.IsSuccessful)
+            {
+                Console.WriteLine($"Successfully transitioned {issueKey} to {transitionName}");
+                return true;
+            }
+
+            Console.WriteLine($"Failed to transition {issueKey}: {response.StatusCode}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception transitioning Jira issue: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Gets the transition ID for a specific transition name
+    /// </summary>
+    private async Task<string?> GetTransitionId(string issueKey, string transitionName)
+    {
+        try
+        {
+            var url = $"{_baseUrl}/rest/api/3/issue/{issueKey}/transitions";
+            var options = new RestClientOptions(url);
+            var client = new RestClient(options);
+            var request = new RestRequest();
+
+            request.AddHeader("Authorization", _authHeader);
+            request.AddHeader("Accept", "application/json");
+
+            var response = await client.GetAsync(request);
+
+            if (!response.IsSuccessful)
+            {
+                return null;
+            }
+
+            var jsonResponse = JsonNode.Parse(response.Content!);
+            var transitions = jsonResponse?["transitions"]?.AsArray();
+
+            if (transitions == null)
+            {
+                return null;
+            }
+
+            foreach (var transition in transitions)
+            {
+                var name = transition?["name"]?.ToString();
+                if (name?.Equals(transitionName, StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    return transition?["id"]?.ToString();
+                }
+            }
+
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets information about a specific Jira issue
+    /// </summary>
+    /// <param name="issueKey">The Jira issue key</param>
+    /// <returns>JiraTicket object with current issue data</returns>
+    public async Task<JiraTicket?> GetIssue(string issueKey)
+    {
+        try
+        {
+            var url = $"{_baseUrl}/rest/api/3/issue/{issueKey}";
+            var options = new RestClientOptions(url);
+            var client = new RestClient(options);
+            var request = new RestRequest();
+
+            request.AddHeader("Authorization", _authHeader);
+            request.AddHeader("Accept", "application/json");
+
+            var response = await client.GetAsync(request);
+
+            if (!response.IsSuccessful)
+            {
+                Console.WriteLine($"Failed to get Jira issue {issueKey}: {response.StatusCode}");
+                return null;
+            }
+
+            var jsonResponse = JsonNode.Parse(response.Content!);
+            var fields = jsonResponse?["fields"];
+
+            return new JiraTicket
+            {
+                IssueKey = issueKey,
+                IssueId = jsonResponse?["id"]?.ToString() ?? "",
+                Summary = fields?["summary"]?.ToString() ?? "",
+                Status = fields?["status"]?["name"]?.ToString() ?? "",
+                Priority = fields?["priority"]?["name"]?.ToString() ?? "Medium",
+                WebUrl = $"{_baseUrl}/browse/{issueKey}",
+                CreatedAt = DateTime.Parse(fields?["created"]?.ToString() ?? DateTime.UtcNow.ToString()),
+                UpdatedAt = DateTime.Parse(fields?["updated"]?.ToString() ?? DateTime.UtcNow.ToString())
+            };
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception getting Jira issue: {ex.Message}");
+            return null;
+        }
+    }
+}

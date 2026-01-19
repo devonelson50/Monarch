@@ -15,7 +15,7 @@
 #       - Initialization scripts
 #   - Secrets management via Docker Secrets
 #       - text files are used for testing and development, these have been included in
-#         .gitignnore
+#         .gitignore
 #       - In production, external flags will be set to allow secure secret injection
 #   - Service health checks to prevent premature database calls
 #   - Environment variables
