@@ -11,8 +11,8 @@ while true; do
   STATUSES=("Healthy" "Healthy" "Healthy" "Warning" "Critical")
   STATUS=${STATUSES[$(( RANDOM % 5 ))]}
 
-  curl -s -v -X POST "https://insights-collector.newrelic.com/v1/accounts/7596990/events" \
-    -H "Api-Key: 54a5fb14a53029f8ba9945387b115ea7FFFFNRAL" \
+  curl -s -v -X POST "https://insights-collector.newrelic.com/v1/accounts/____/events" \
+    -H "Api-Key: ____" \
     -H "Content-Type: application/json" \
     -d "[{\"eventType\":\"AppHealth\",\"appName\":\"Docker-Sim-App\",\"status\":\"$STATUS\",\"latency\":$LATENCY}]"
   
