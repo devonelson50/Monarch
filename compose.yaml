@@ -47,6 +47,7 @@ services:
       - monarch_newrelic_api_key
       - monarch_nagios_api_details
       - monarch_jira_api_key
+      - monarch_simulator_account_number
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
@@ -121,3 +122,5 @@ secrets:
   monarch_oidc_client_secret:
     # external: true
     file: ./.credentials/oidc_client_secret.txt # development only
+  monarch_simulator_account_number: #development only
+    file: ./.credentials/monarch_simulator_account_number.txt

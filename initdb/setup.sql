@@ -131,12 +131,21 @@ ALTER ROLE db_datareader ADD MEMBER monarch;
 IF OBJECT_ID('newRelicApps', 'U') IS NULL
 BEGIN
     CREATE TABLE newRelicApps (
-        appId VARCHAR(100) PRIMARY KEY,
-        appName VARCHAR(100) NOT NULL,
-        status VARCHAR(100) NOT NULL,
-        mostRecentIndicentId INT
-    );
-END
+        appId INT PRIMARY KEY,
+        appName VARCHAR(255) NOT NULL,
+        displayName VARCHAR(255),
+        ipAddress VARCHAR(64),
+        status INT NOT NULL,
+        latency_ms INT,
+        cpuUsage_percent FLOAT,
+        memoryFree_mb INT,
+        throughput_rpm INT,
+        errorRate_percent FLOAT,
+        statusUpdateTime DATETIME,
+        lastCheck DATETIME,
+        output VARCHAR(500),
+        perfData VARCHAR(500)
+    );END
 GO
 
 IF OBJECT_ID('newRelicIncidents', 'U') IS NULL
