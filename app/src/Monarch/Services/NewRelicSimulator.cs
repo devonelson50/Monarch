@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+/*(using System.Net.Http.Json;
 
 public class NewRelicSimulator : BackgroundService{
   private readonly IHttpClientFactory _httpClientFactory;
@@ -12,7 +12,12 @@ public class NewRelicSimulator : BackgroundService{
   }
 
   protected override async Task ExecuteAsync(CancellationToken stoppingToken){
-    var client = _httpClientFactory.CreateClient();
+    var handler = new HttpClientHandler
+    {
+        ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true 
+    };
+
+    using var client = new HttpClient(handler); 
     client.DefaultRequestHeaders.Add("Api-Key", _licenseKey);
 
     while (!stoppingToken.IsCancellationRequested){
@@ -28,8 +33,10 @@ public class NewRelicSimulator : BackgroundService{
       try{
         await client.PostAsJsonAsync(url, events, stoppingToken);
       } catch (Exception ex){
-        Console.Write("Error");
+        Console.WriteLine($"SIMULATOR ERROR: {ex.Message}");
       }
+
+      Console.WriteLine("Successfully sent data");
 
       await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
     }
@@ -39,8 +46,8 @@ public class NewRelicSimulator : BackgroundService{
 public class AppHealthEvent
 {
   public string eventType { get; set; } = "ApplicationHealth";
-  public string appName { get; set; }
-  public string status { get; set; }
+  public required string  appName { get; set; }
+  public required string status { get; set; }
   public int responseTime { get; set; }
   public int cpuUsage { get; set; }
-}
+}*/

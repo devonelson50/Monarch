@@ -21,4 +21,26 @@ RUN dotnet publish "Monarch.csproj" -c $configuration -o /app/publish /p:UseAppH
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "Monarch.dll"]
+
+
+
+# --- FOR SIMULATOR ---
+#Can be deleted in production
+
+#Copy the scripts from your local project root to the container
+COPY app/src/Monarch/start.sh .
+COPY app/src/Monarch/simulator.sh .
+
+#Switch to root briefly to ensure the scripts are executable, fix line endings, and install curl
+USER root
+
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+RUN sed -i 's/\r$//' start.sh simulator.sh && \
+    chmod +x start.sh simulator.sh
+
+#Switch back to the app user
+USER app
+
+#hange the ENTRYPOINT to use the manager script
+ENTRYPOINT ["./start.sh"]
