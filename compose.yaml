@@ -48,6 +48,8 @@ services:
       - monarch_nagios_api_details
       - monarch_jira_api_key
       - monarch_simulator_account_number
+    environment:
+      nagios_uri: https://nxi.455garage.com/nagiosxi/ # 1:1 match with external URL in General Program Settings
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
@@ -112,7 +114,7 @@ secrets:
     file: ./.credentials/newrelic_api_key.txt # development only
   monarch_nagios_api_details:
     # external: true
-    file: ./.credentials/nagios_api_details.txt # development only
+    file: ./.credentials/nagios_api_key.txt # development only
   monarch_jira_api_key:
     # external: true
     file: ./.credentials/jira_api_key.txt # development only
