@@ -133,18 +133,14 @@ BEGIN
     CREATE TABLE newRelicApps (
         appId INT PRIMARY KEY,
         appName VARCHAR(255) NOT NULL,
-        displayName VARCHAR(255),
         ipAddress VARCHAR(64),
         status INT NOT NULL,
-        latency_ms INT,
-        cpuUsage_percent FLOAT,
-        memoryFree_mb INT,
-        throughput_rpm INT,
-        errorRate_percent FLOAT,
-        statusUpdateTime DATETIME,
-        lastCheck DATETIME,
+        latency INT,
+        cpuUsage FLOAT,
+        throughput INT,
         output VARCHAR(500),
-        perfData VARCHAR(500)
+        statusUpdateTime DATETIME,
+        lastCheck DATETIME
     );END
 GO
 

@@ -12,8 +12,8 @@ public class NewRelicApp
     public string IpAddress { get; set; }
     public int Status { get; set; }
     public string Latency { get; set; }
-    public double CpuUsagePercent { get; set; }
-    public int ThroughputRpm { get; set; }
+    public double CpuUsage { get; set; }
+    public int Throughput { get; set; }
     public string Output { get; set; }
     public DateTime StatusUpdateTime { get; set; }
 

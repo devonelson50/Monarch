@@ -20,7 +20,7 @@ public class NewRelicConnector
 
     public NewRelicConnector()
     {
-        this.accountId = File.ReadAllText("/run/secrets/monarch_simulator_account_number").Trim();
+        this.accountId = File.ReadAllText("/run/secrets/monarch_account_number").Trim();
         this.apiKey = File.ReadAllText("/run/secrets/monarch_newrelic_api_key").Trim();
         this.monapiKey = File.ReadAllText("/run/secrets/monarch_sql_monapi_password").Trim();
     }
@@ -31,8 +31,19 @@ public class NewRelicConnector
     /// <returns></returns>
     public async Task RunConnector()
     {
+        Console.WriteLine("DEBUG: Calling New Relic API...");
         List<NewRelicApp> apps = await GetApps();
-        await this.WriteToDatabase(apps);
+        
+        Console.WriteLine($"DEBUG: New Relic returned {apps.Count} apps.");
+
+        if (apps.Count > 0)
+        {
+            await this.WriteToDatabase(apps);
+        }
+        else
+        {
+            Console.WriteLine("DEBUG: Skipping Database write because 0 apps were found.");
+        }
     }
 
     /// <summary>
@@ -43,59 +54,70 @@ public class NewRelicConnector
     private async Task<List<NewRelicApp>> GetApps()
     {
         var apps = new List<NewRelicApp>();
-        var uri = "https://api.newrelic.com/v1/accounts/{accountId}/query";
+        var uri = $"https://api.newrelic.com/graphql";
         do
         {
-            var options = new RestClientOptions(uri);
-            var client = new RestClient(options);
-            var request = new RestRequest();
-            request.AddHeader("Api-Key", this.apiKey);
-            
-            ///Query sent to New Relic
-            string nrql = @"SELECT 
-            latest(hostObjectId) as id, 
-            latest(ipAddress) as ip, 
-            latest(currentState) as state, 
-            latest(latency) as lat, 
-            latest(cpuUsage) as cpu, 
-            latest(throughput) as tput, 
-            latest(output) as msg,
-            latest(statusUpdateTime) as updated
-            FROM Metric FACET hostName LIMIT MAX SINCE 5 minutes ago";
+            var options = new RestClientOptions(uri)
+            {
+                Timeout = TimeSpan.FromSeconds(15)
+            };
 
-            request.AddQueryParameter("nrql", nrql);
+            var client = new RestClient(options);
+            
+            var query = @"
+            {
+                actor {
+                    account(id: " + accountId + @") {
+                        nrql(query: ""SELECT latest(hostObjectId) as id, latest(ipAddress) as ip, latest(currentState) as state, latest(latency) as lat, latest(cpuUsage) as cpu, latest(throughput) as tput, latest(output) as msg, latest(statusUpdateTime) as updated FROM Metric FACET hostName LIMIT MAX SINCE 5 minutes ago"") {
+                            results
+                        }
+                    }
+                }
+            }";
+
+            var request = new RestRequest("", Method.Post);
+            request.AddHeader("Api-Key", this.apiKey);
+            request.AddJsonBody(new { query = query });
 
             var response = await client.ExecuteAsync(request);
 
             if (!(response.IsSuccessful))
             {
-                throw new Exception("New Relic API Error: {response.Content}");
+                if (response.StatusCode == 0)
+                {
+                    throw new Exception($"Network Failure (Status 0): {response.ErrorMessage ?? response.ErrorException?.Message ?? "Unknown Network Error"}");
+                }
+                else
+                {
+                    // If StatusCode is > 0 (like 401 or 500), the server replied.
+                    throw new Exception($"API Error: {response.StatusCode} - {response.Content}");
+                }            
             }
             else
             {
                 var jNode = JsonNode.Parse(response.Content!);
-                var results = jNode?["results"]?[0]?["facets"]?.AsArray();
+                var results = jNode?["data"]?["actor"]?["account"]?["nrql"]?["results"]?.AsArray();
 
-        if (results != null)
-        {
-            foreach (var facet in results)
-            {
-                var data = facet["results"];
-                apps.Add(new NewRelicApp
+                if (results != null)
                 {
-                    AppName = facet["name"]?.ToString() ?? "Unknown",
-                    AppId = int.Parse(data?[0]?["latest"]?.ToString() ?? "0"),
-                    IpAddress = data?[1]?["latest"]?.ToString() ?? "0.0.0.0",
-                    Status = int.Parse(data?[2]?["latest"]?.ToString() ?? "0"),
-                    Latency = data?[3]?["latest"]?.ToString() ?? "0ms",
-                    CpuUsagePercent = double.Parse(data?[4]?["latest"]?.ToString() ?? "0"),
-                    ThroughputRpm = int.Parse(data?[5]?["latest"]?.ToString() ?? "0"),
-                    Output = data?[6]?["latest"]?.ToString() ?? "",
-                    StatusUpdateTime = DateTime.TryParse(data?[7]?["latest"]?.ToString(), out var dt) ? dt : DateTime.Now
-                });
-            }
-        }
-                uri = jNode["link"]["next"].ToString(); // Get the next page, if null terminate the loop
+                    foreach (var result in results)
+                    {
+                        var hostName = result["facet"]?.ToString() ?? "Unknown";
+
+                        apps.Add(new NewRelicApp
+                        {
+                            AppName = hostName,
+                            AppId = (int)(result["id"]?.GetValue<double>() ?? 0),
+                            IpAddress = result["ip"]?.ToString() ?? "0.0.0.0",
+                            Status = (int)(result["state"]?.GetValue<double>() ?? 0),
+                            Latency = result["lat"]?.ToString() ?? "0ms",
+                            CpuUsage = result["cpu"]?.GetValue<double>() ?? 0.0,
+                            Throughput = (int)(result["tput"]?.GetValue<double>() ?? 0),
+                            Output = result["msg"]?.ToString() ?? "",
+                            StatusUpdateTime = DateTime.TryParse(result["updated"]?.ToString(), out var dt) ? dt : DateTime.Now
+                        });
+                    }
+                }
             }
         } while (uri != null);
 
@@ -109,6 +131,8 @@ public class NewRelicConnector
     /// <returns></returns>
     public async Task WriteToDatabase(List<NewRelicApp> apps)
     {
+        
+        
         var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={monapiKey};TrustServerCertificate=True;";
         using (var connection = new SqlConnection(connectionString))
         {
@@ -119,6 +143,9 @@ public class NewRelicConnector
             {
                 try
                 {
+                    // 1. Log before deleting
+                    Console.WriteLine("DEBUG: Deleting old rows from newRelicApps...");
+
                     var deleteQuery = "DELETE FROM newRelicApps";
                     using (var deleteCmd = new SqlCommand(deleteQuery, connection, transaction))
                     {
@@ -126,8 +153,11 @@ public class NewRelicConnector
                     }
 
                     var insertQuery = @"INSERT INTO newRelicApps 
-                        (hostObjectId, hostName, ipAddress, currentState, latency, cpuUsage_percent, throughput_rpm, output, statusUpdateTime, lastCheck) 
+                        (appId, appName, ipAddress, status, latency, cpuUsage, throughput, output, statusUpdateTime, lastCheck) 
                         VALUES (@id, @name, @ip, @state, @lat, @cpu, @tput, @msg, @updated, GETDATE())";
+
+                    // 2. Log every 10th insert to track progress
+                    int count = 0;
 
                     foreach (var app in apps)
                     {
@@ -138,20 +168,23 @@ public class NewRelicConnector
                             insertCmd.Parameters.AddWithValue("@ip", app.IpAddress);
                             insertCmd.Parameters.AddWithValue("@state", app.Status);
                             insertCmd.Parameters.AddWithValue("@lat", app.Latency);
-                            insertCmd.Parameters.AddWithValue("@cpu", app.CpuUsagePercent);
-                            insertCmd.Parameters.AddWithValue("@tput", app.ThroughputRpm);
+                            insertCmd.Parameters.AddWithValue("@cpu", app.CpuUsage);
+                            insertCmd.Parameters.AddWithValue("@tput", app.Throughput);
                             insertCmd.Parameters.AddWithValue("@msg", app.Output);
                             insertCmd.Parameters.AddWithValue("@updated", app.StatusUpdateTime);
                             
                             await insertCmd.ExecuteNonQueryAsync();
                         }
+                        count++;
+                        if (count % 10 == 0) Console.WriteLine($"DEBUG: Inserted {count}/50 apps...");
                     }
 
                     await transaction.CommitAsync();
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    await transaction.RollbackAsync();
+                    // This is the most important log!
+                    Console.WriteLine($"!!! SQL ERROR IN TRANSACTION: {ex.Message}");
                     throw;
                 }
             }

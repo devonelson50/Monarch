@@ -19,24 +19,17 @@ FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 
-
-# --- FOR SIMULATOR ---
-#Can be deleted in production
-
-#Copy the scripts from your local project root to the container
-COPY app/src/Monapi.Worker/start.sh .
+#This is for testing only
+#Delete in production
 COPY app/src/Monapi.Worker/NewRelic/simulator.sh .
 
-#Switch to root briefly to ensure the scripts are executable, fix line endings, and install curl
 USER root
 
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-RUN sed -i 's/\r$//' start.sh simulator.sh && \
-    chmod +x start.sh simulator.sh
+RUN chmod +x simulator.sh
 
-#Switch back to the app user
 USER app
+# ---------------------------
 
-#Changed the ENTRYPOINT to use the manager script, change back to Monapi for production
-ENTRYPOINT ["./start.sh"]
+ENTRYPOINT ["dotnet", "Monapi.Worker.dll"]

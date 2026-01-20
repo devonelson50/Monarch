@@ -7,8 +7,8 @@
 #!/bin/bash
 
 #Finds secret files
-ACCOUNT_FILE="/run/secrets/monarch_simulator_account_number"
-LICENSE_FILE="/run/secrets/monarch_newrelic_api_key"
+ACCOUNT_FILE="/run/secrets/monarch_account_number"
+LICENSE_FILE="/run/secrets/monarch_simulator_api_key"
 
 #Reads secret files
 ACCOUNT_ID=$(cat "$ACCOUNT_FILE" | tr -d '[:space:]')
@@ -89,11 +89,11 @@ EOF
     curl -s -X POST "https://metric-api.newrelic.com/metric/v1" \
       -H "Api-Key: $LICENSE_KEY" \
       -H "Content-Type: application/json" \
-      -d "$JSON_PAYLOAD"
+      -d "$JSON_PAYLOAD" > /dev/null
     
     sleep 0.1 #Throttle to prevent network congestion
   done
 
-  echo ">>> Sent real-time metrics for all 50 apps."
+  echo "Sent real-time metrics for all 50 apps"
   sleep 1m #Wait 1 minute to send more data
 done
