@@ -261,8 +261,8 @@ public class JiraManager
                 await connection.OpenAsync();
                 
                 var query = @"
-                    INSERT INTO jira (ticketId, incidentId, teamId, issueKey, issueId, openTime, summary, description, webUrl) 
-                    VALUES (@ticketId, @incidentId, @teamId, @issueKey, @issueId, @openTime, @summary, @description, @webUrl)";
+                    INSERT INTO jira (ticketId, incidentId, teamId, issueKey, openTime, summary, description) 
+                    VALUES (@ticketId, @incidentId, @teamId, @issueKey, @openTime, @summary, @description)";
                 
                 using (var command = new SqlCommand(query, connection))
                 {
@@ -271,11 +271,9 @@ public class JiraManager
                     command.Parameters.AddWithValue("@incidentId", incidentId);
                     command.Parameters.AddWithValue("@teamId", 1); // Default team, can be enhanced later
                     command.Parameters.AddWithValue("@issueKey", ticket.IssueKey);
-                    command.Parameters.AddWithValue("@issueId", ticket.IssueId);
                     command.Parameters.AddWithValue("@openTime", ticket.CreatedAt);
                     command.Parameters.AddWithValue("@summary", ticket.Summary);
                     command.Parameters.AddWithValue("@description", ticket.Description);
-                    command.Parameters.AddWithValue("@webUrl", ticket.WebUrl);
                     
                     await command.ExecuteNonQueryAsync();
                 }
