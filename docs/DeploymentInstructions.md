@@ -1,6 +1,28 @@
 <!-- Devon Nelson -->
 # Monarch Deployment Instructions
 
+- [Monarch Deployment Instructions](#monarch-deployment-instructions)
+  - [Overview](#overview)
+    - [Outbound Connectivity Requirements](#outbound-connectivity-requirements)
+      - [Monapi Service Worker Container](#monapi-service-worker-container)
+    - [Inbound Connectivity Requirements](#inbound-connectivity-requirements)
+  - [Container Stack Configuration](#container-stack-configuration)
+    - [Environment Variables](#environment-variables)
+      - [monapi-worker: nagios\_uri](#monapi-worker-nagios_uri)
+    - [Docker Secrets](#docker-secrets)
+      - [Nagios API Key](#nagios-api-key)
+      - [New Relic API Key](#new-relic-api-key)
+      - [Jira API Key](#jira-api-key)
+      - [OIDC Client Secret](#oidc-client-secret)
+      - [Slack Webhooks](#slack-webhooks)
+      - [SMTP Connection](#smtp-connection)
+      - [SQL Credentials](#sql-credentials)
+    - [OIDC Client Configuration](#oidc-client-configuration)
+      - [Generate a Unique Client Secret](#generate-a-unique-client-secret)
+      - [Set the OIDC Client Secret in Docker Secrets](#set-the-oidc-client-secret-in-docker-secrets)
+      - [Update Keycloak's Configuration](#update-keycloaks-configuration)
+      - [Additional Notes Regarding OIDC Configuration](#additional-notes-regarding-oidc-configuration)
+
 ## Overview
 > This document includes details related to deploying Monarch in a Docker environment. 
 ### Outbound Connectivity Requirements
@@ -43,19 +65,33 @@ By default, the container stack is delivered with a default OIDC client secret. 
 > Online client secret generation tools are available, but not recommended.
 
 Monarch will accept any 32-byte client secret. To generate a random secret, use the generation function included in your cloud-platform of choice. In the absence of this, the following can be used to generate a random secret from your local machine:
-##### Powershell 7
+
+Powershell 7:
 ``` Powershell
 -join $(1..32 | % {(65..90 + 97..122 + 48..57 | Get-SecureRandom) | % {[char]$_ }})
 ```
-##### Bash
+Bash:
 ``` Bash
 head -c 32 /dev/urandom | base64
 ```
 
 #### Set the OIDC Client Secret in Docker Secrets
 Set the value of the Docker Secret `monarch_oidc_client_secret` to the client secret generated in the previous step. The exact process will depend on your Docker environment.
+
 #### Update Keycloak's Configuration
+To replace the default OIDC client secret in Keycloak's configuration, open [realm.json](../keycloak/realm.json). Using the find and replace utility in your text editor, replace the single occurrence of the default secret:
+
+Before:
+```
+"secret" : "uwvqb51RdR15FCYlqeBK72w9LdxDDXAN",
+```
+
+After:
+```
+"secret" : "<NEW OIDC CLIENT SECRET>",
+```
+Save the configuration, and allow the Monarch and Keycloak containers to start/restart for the changes to take effect.
 
 #### Additional Notes Regarding OIDC Configuration
-Our team initially considering including a component to automatically generate and configure the OIDC client secret based on the value stored in the Docker Secret. While it is possible to import a client secret into the Keycloak configuration using Docker Secrets, and Keycloak's API, this does not eliminate the issue of Keycloak's native configuration export including the client secret in plaintext. Because of this behavior, any future changes to Keycloak's configuration will leak the client secret despite the added complexity. Implementing this automation would result in a portion of our code deliberately writing a credential to a json in plaintext. With this in mind, we have determined it is best to prioritize properly handling the client secret in the rest of the container stack to ensure the issue can be completely remediated by removing Keycloak from the container stack. As mentioned in our Risk-Based Information Security Analysis, we highly recommend configuring Monarch to interact directly with your Identity Provider of choice instead of Keycloak.
+Our team initially planned to include a component to automatically generate and configure the OIDC client secret based on the value stored in the Docker Secret. While it is possible to import a client secret into the Keycloak configuration using Docker Secrets and Keycloak's API, this does not eliminate the issue of Keycloak's native configuration export including the client secret in plaintext. Because of this behavior, any future changes to Keycloak's configuration will once again leak the client secret. Implementing this automation would result in a portion of our code deliberately writing a credential to a json in plaintext. With this in mind, we have determined it is best to prioritize properly handling the client secret in the rest of the container stack to ensure the issue can be completely remediated by removing Keycloak from the container stack. As mentioned in our Risk-Based Information Security Analysis, we highly recommend configuring Monarch to interact directly with your Identity Provider of choice instead of Keycloak.
 
