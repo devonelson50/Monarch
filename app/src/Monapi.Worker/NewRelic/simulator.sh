@@ -59,20 +59,19 @@ while true; do #Send data as long as container is running
         "attributes": {
           "hostObjectId": $HOST_ID,
           "hostName": "$APPNAME",
-          "displayName": "$APPNAME-Server",
           "ipAddress": "$IP_ADDR"
         }
       },
       "metrics": [
         {
-          "name": "nagios.host.health",
+          "name": "newRelic.host.health",
           "type": "gauge",
           "value": $STATE,
           "timestamp": $NOW,
           "attributes": {
             "currentState": $STATE,
             "output": "$STATUS_MSG",
-            "latency": "${LATENCY}ms",
+            "latency": "${LATENCY}",
             "cpuUsage": $CPU,
             "throughput": $THROUGHPUT,
             "errorRate": $ERROR_RATE,

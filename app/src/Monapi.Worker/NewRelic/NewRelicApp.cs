@@ -11,10 +11,15 @@ public class NewRelicApp
     public string AppName { get; set; }
     public string IpAddress { get; set; }
     public int Status { get; set; }
-    public string Latency { get; set; }
+    public int Latency { get; set; }
     public double CpuUsage { get; set; }
     public int Throughput { get; set; }
     public string Output { get; set; }
     public DateTime StatusUpdateTime { get; set; }
+
+  public override string ToString()
+  {
+    return $"id: {AppId}\napp name: {AppName}\nip: {IpAddress}\nstatus: {Status}\nlat: {Latency}\ncpu: {CpuUsage}\ntput: {Throughput}\ntime: {StatusUpdateTime}";
+  }
 
 }
