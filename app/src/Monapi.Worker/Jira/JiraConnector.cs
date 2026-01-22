@@ -5,10 +5,9 @@ using RestSharp;
 
 namespace Monapi.Worker.Jira;
 
-/// <summary>
-/// Handles direct communication with Jira REST API
-/// Manages authentication, request formatting, and response parsing
-/// </summary>
+// Handles direct communication with Jira REST API
+// Manages authentication, request formatting, and response parsing
+
 public class JiraConnector
 {
     private readonly string _baseUrl;
@@ -27,13 +26,8 @@ public class JiraConnector
         _authHeader = $"Basic {base64Credentials}";
     }
 
-    /// <summary>
-    /// Creates a new Jira issue for an incident
-    /// </summary>
-    /// <param name="summary">Brief title of the issue</param>
-    /// <param name="description">Detailed description of the incident</param>
-    /// <param name="priority">Priority level (High/Medium/Low)</param>
-    /// <returns>Created JiraTicket object with issue key and metadata</returns>
+    // Creates a new Jira issue for an incident
+
     public async Task<JiraTicket?> CreateIssue(string summary, string description, string priority = "Medium")
     {
         try
@@ -103,12 +97,10 @@ public class JiraConnector
             return new JiraTicket
             {
                 IssueKey = issueKey,
-                IssueId = issueId ?? "",
                 Summary = summary,
                 Description = description,
                 Status = "Open",
                 Priority = priority,
-                WebUrl = $"{_baseUrl}/browse/{issueKey}",
                 CreatedAt = DateTime.UtcNow
             };
         }
@@ -119,12 +111,8 @@ public class JiraConnector
         }
     }
 
-    /// <summary>
-    /// Adds a comment to an existing Jira issue
-    /// </summary>
-    /// <param name="issueKey">The Jira issue key (e.g., "MON-123")</param>
-    /// <param name="comment">Comment text to add</param>
-    /// <returns>True if successful</returns>
+    // Adds a comment to an existing Jira issue
+
     public async Task<bool> AddComment(string issueKey, string comment)
     {
         try
@@ -181,12 +169,8 @@ public class JiraConnector
         }
     }
 
-    /// <summary>
-    /// Transitions a Jira issue to a different status (e.g., "Done", "In Progress")
-    /// </summary>
-    /// <param name="issueKey">The Jira issue key</param>
-    /// <param name="transitionName">Name of the transition (e.g., "Done", "Close")</param>
-    /// <returns>True if successful</returns>
+    // Transitions a Jira issue to a different status (e.g., "Done", "In Progress")
+
     public async Task<bool> TransitionIssue(string issueKey, string transitionName)
     {
         try
@@ -231,9 +215,8 @@ public class JiraConnector
         }
     }
 
-    /// <summary>
-    /// Gets the transition ID for a specific transition name
-    /// </summary>
+    // Gets the transition ID for a specific transition name
+
     private async Task<string?> GetTransitionId(string issueKey, string transitionName)
     {
         try
@@ -278,11 +261,7 @@ public class JiraConnector
         }
     }
 
-    /// <summary>
-    /// Gets information about a specific Jira issue
-    /// </summary>
-    /// <param name="issueKey">The Jira issue key</param>
-    /// <returns>JiraTicket object with current issue data</returns>
+    // Gets information about a specific Jira issue
     public async Task<JiraTicket?> GetIssue(string issueKey)
     {
         try
@@ -309,11 +288,9 @@ public class JiraConnector
             return new JiraTicket
             {
                 IssueKey = issueKey,
-                IssueId = jsonResponse?["id"]?.ToString() ?? "",
                 Summary = fields?["summary"]?.ToString() ?? "",
                 Status = fields?["status"]?["name"]?.ToString() ?? "",
                 Priority = fields?["priority"]?["name"]?.ToString() ?? "Medium",
-                WebUrl = $"{_baseUrl}/browse/{issueKey}",
                 CreatedAt = DateTime.Parse(fields?["created"]?.ToString() ?? DateTime.UtcNow.ToString()),
                 UpdatedAt = DateTime.Parse(fields?["updated"]?.ToString() ?? DateTime.UtcNow.ToString())
             };

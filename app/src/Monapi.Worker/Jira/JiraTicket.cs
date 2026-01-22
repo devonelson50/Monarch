@@ -1,53 +1,28 @@
 namespace Monapi.Worker.Jira;
 
-/// <summary>
-/// Data model representing a Jira ticket/issue
-/// Used to abstract Jira issue data for the Monarch monitoring system
-/// </summary>
+// Data model representing a Jira ticket/issue
+// Used to abstract Jira issue data for the Monarch monitoring system
+
 public class JiraTicket
 {
-    /// <summary>
-    /// Jira issue key (e.g., "MON-123")
-    /// </summary>
+    // Jira issue key (e.g., "MON-123")
     public string IssueKey { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Jira internal issue ID
-    /// </summary>
-    public string IssueId { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Brief summary of the incident
-    /// </summary>
+    // Brief summary of the incident
     public string Summary { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Detailed description of the incident
-    /// </summary>
+    // Detailed description of the incident
     public string Description { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Current status of the ticket (e.g., "Open", "In Progress", "Done")
-    /// </summary>
+    // Current status of the ticket (e.g., "Open", "In Progress", "Done")
     public string Status { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Priority level (e.g., "High", "Medium", "Low")
-    /// </summary>
+    // Priority level (e.g., "High", "Medium", "Low")
     public string Priority { get; set; } = "Medium";
 
-    /// <summary>
-    /// Link to the Jira issue in browser
-    /// </summary>
-    public string WebUrl { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Timestamp when the ticket was created
-    /// </summary>
+    // Timestamp when the ticket was created
     public DateTime CreatedAt { get; set; }
 
-    /// <summary>
-    /// Timestamp when the ticket was last updated
-    /// </summary>
+    // Timestamp when the ticket was last updated
     public DateTime? UpdatedAt { get; set; }
 }

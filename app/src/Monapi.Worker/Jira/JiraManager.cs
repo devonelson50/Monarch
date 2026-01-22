@@ -2,10 +2,9 @@ using Microsoft.Data.SqlClient;
 
 namespace Monapi.Worker.Jira;
 
-/// <summary>
-/// Manages Jira ticket lifecycle based on application incidents
-/// Tracks status changes, creates tickets when needed, and updates existing tickets
-/// </summary>
+// Manages Jira ticket lifecycle based on application incidents
+// Tracks status changes, creates tickets when needed, and updates existing tickets
+
 public class JiraManager
 {
     private readonly JiraConnector _connector;
@@ -17,14 +16,9 @@ public class JiraManager
         _sqlPassword = sqlPassword;
     }
 
-    /// <summary>
-    /// Handles application status change and creates Jira ticket if needed
-    /// </summary>
-    /// <param name="appId">Application ID from database</param>
-    /// <param name="appName">Application name</param>
-    /// <param name="oldStatus">Previous status</param>
-    /// <param name="newStatus">Current status</param>
-    /// <param name="shouldCreateTicket">Whether this app has Jira alerts enabled</param>
+
+    // Handles application status change and creates Jira ticket if needed
+
     public async Task HandleStatusChange(string appId, string appName, string oldStatus, string newStatus, bool shouldCreateTicket)
     {
         if (!shouldCreateTicket)
@@ -63,9 +57,7 @@ public class JiraManager
         }
     }
 
-    /// <summary>
-    /// Determines if the status change represents worsening conditions
-    /// </summary>
+    // Determines if the status change represents worsening conditions
     private bool IsStatusWorsening(string oldStatus, string newStatus)
     {
         var statusPriority = new Dictionary<string, int>
@@ -81,9 +73,7 @@ public class JiraManager
         return newPriority > oldPriority;
     }
 
-    /// <summary>
-    /// Gets the open incident ID for an application, if one exists
-    /// </summary>
+    // Gets the open incident ID for an application, if one exists
     private async Task<int?> GetOpenIncidentId(string appId)
     {
         try
@@ -117,9 +107,7 @@ public class JiraManager
         }
     }
 
-    /// <summary>
-    /// Creates a new incident record and associated Jira ticket
-    /// </summary>
+    // Creates a new incident record and associated Jira ticket
     private async Task CreateNewIncident(string appId, string appName, string status)
     {
         try
@@ -172,9 +160,7 @@ public class JiraManager
         }
     }
 
-    /// <summary>
-    /// Updates an existing incident with additional information
-    /// </summary>
+    // Updates an existing incident with additional information
     private async Task UpdateExistingIncident(int incidentId, string appName, string newStatus)
     {
         try
@@ -196,9 +182,7 @@ public class JiraManager
         }
     }
 
-    /// <summary>
-    /// Handles application recovery by closing open incidents
-    /// </summary>
+    // Handles application recovery by closing open incidents
     private async Task HandleRecovery(string appId, string appName)
     {
         try
@@ -247,9 +231,7 @@ public class JiraManager
         }
     }
 
-    /// <summary>
-    /// Stores Jira ticket information in the database
-    /// </summary>
+    // Stores Jira ticket information in the database
     private async Task StoreJiraTicket(JiraTicket ticket, int incidentId)
     {
         try
@@ -285,9 +267,7 @@ public class JiraManager
         }
     }
 
-    /// <summary>
-    /// Gets the Jira ticket key for a specific incident
-    /// </summary>
+    // Gets the Jira ticket key for a specific incident
     private async Task<string?> GetJiraTicketForIncident(int incidentId)
     {
         try
