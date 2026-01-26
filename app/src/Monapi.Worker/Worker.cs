@@ -28,8 +28,9 @@ public class Worker : BackgroundService
         // Initialize Jira integration
         await InitializeJiraIntegration();
 
+        Nagios.NagiosConnector nc = new Nagios.NagiosConnector();
         NewRelic.NewRelicSimulator nrs = new NewRelic.NewRelicSimulator();
-
+        
         while (!stoppingToken.IsCancellationRequested)
         {
             Console.WriteLine($"{DateTime.Now:HH:mm:ss} - Refreshing NewRelic data");
@@ -38,8 +39,12 @@ public class Worker : BackgroundService
             // Check for status changes and trigger Jira tickets
             await MonitorStatusChanges();
 
+            Console.WriteLine($"{DateTime.Now:HH:mm:ss} - Refreshing Nagios data");
+            nc.RunConnector();
             await Task.Delay(30000, stoppingToken);
         }
+
+        
     }
 
     /// <summary>
