@@ -179,6 +179,9 @@ BEGIN
     CREATE TABLE jira (
         ticketId INT PRIMARY KEY,
         incidentId INT NOT NULL,
+        --Issue key from Jira. Need to store it to be able to update issues in Jira from within Monarch
+        --Different from incidentId as that attribute is used to store the internal Monarch incident ID
+        issueKey VARCHAR(100) NOT NULL,
         teamId INT NOT NULL,
         openTime DATETIME NOT NULL,
         closeTime DATETIME,
