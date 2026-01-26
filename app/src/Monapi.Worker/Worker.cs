@@ -72,7 +72,7 @@ public class Worker : BackgroundService
         catch (FileNotFoundException)
         {
             Console.WriteLine("⚠️  Jira API key not found. Jira integration disabled.");
-            Console.WriteLine("   Create file: .credentials/jira_api_key.txt with format: email:token");
+            Console.WriteLine("   Create secret 'monarch_jira_api_key' with format: email:token");
         }
         catch (Exception ex)
         {
