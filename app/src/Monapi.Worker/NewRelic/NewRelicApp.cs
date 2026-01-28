@@ -1,13 +1,25 @@
 namespace Monapi.Worker.NewRelic;
 
 /// <summary>
-/// Devon Nelson
+/// Devon Nelson & Brady Brown
 /// 
 /// Used to abstract New Relic application data.
 /// </summary>
 public class NewRelicApp
 {
-    public string AppId { get; set; }
+    public int AppId { get; set; }
     public string AppName { get; set; }
-    public string Status { get; set; }
+    public string IpAddress { get; set; }
+    public int Status { get; set; }
+    public int Latency { get; set; }
+    public double CpuUsage { get; set; }
+    public int Throughput { get; set; }
+    public string Output { get; set; }
+    public DateTime StatusUpdateTime { get; set; }
+
+  public override string ToString()
+  {
+    return $"id: {AppId}\napp name: {AppName}\nip: {IpAddress}\nstatus: {Status}\nlat: {Latency}\ncpu: {CpuUsage}\ntput: {Throughput}\ntime: {StatusUpdateTime}";
+  }
+
 }

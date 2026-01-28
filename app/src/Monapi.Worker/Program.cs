@@ -10,4 +10,5 @@ builder.Services.AddHostedService<Worker>();
 builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
 
 var host = builder.Build();
+
 host.Run();

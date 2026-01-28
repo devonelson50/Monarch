@@ -18,4 +18,18 @@ RUN dotnet publish "Monapi.Worker.csproj" -c $configuration -o /app/publish /p:U
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+
+#This is for testing only
+#Delete in production
+COPY app/src/Monapi.Worker/NewRelic/simulator.sh .
+
+USER root
+
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+RUN chmod +x simulator.sh
+
+USER app
+# ---------------------------
+
 ENTRYPOINT ["dotnet", "Monapi.Worker.dll"]
