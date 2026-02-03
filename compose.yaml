@@ -17,7 +17,6 @@
 #   - Secrets management via Docker Secrets
 #       - text files are used for testing and development, these have been included in
 #         .gitignore
-#         .gitignore
 #       - In production, external flags will be set to allow secure secret injection
 #   - Service health checks to prevent premature database calls
 #   - Environment variables
@@ -48,7 +47,7 @@ services:
     environment:
       ASPNETCORE_Kestrel__Certificates__Default__Path: /certificate/cert.crt
       ASPNETCORE_Kestrel__Certificates__Default__KeyPath: /certificate/key.crt
-      SSL_CERT_FILE: /certificate/root_ca.crt
+      SSL_CERT_FILE: /certificate/client_bundle.crt
     depends_on:
       sqlserver:
         condition: service_healthy
@@ -80,6 +79,7 @@ services:
       - monarch_simulator_api_key
     environment:
       nagios_uri: https://nxi.455garage.com/nagiosxi/ # 1:1 match with external URL in General Program Settings
+      SSL_CERT_FILE: /certificate/client_bundle.crt
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     hostname: sqlserver
@@ -209,7 +209,7 @@ secrets:
     file: ./.credentials/oidc_client_secret.txt # development only
   newrelic_account_number: 
     # external: true
-  file: ./.credentials/newrelic_account_number.txt # development only
+    file: ./.credentials/newrelic_account_number.txt # development only
   monarch_simulator_api_key: # development only
     file: ./.credentials/monarch_simulator_api_key.txt
   mon-ca_key:

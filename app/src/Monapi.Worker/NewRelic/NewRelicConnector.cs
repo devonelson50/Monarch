@@ -21,7 +21,7 @@ public class NewRelicConnector
 
     public NewRelicConnector()
     {
-        var accountIdText = File.ReadAllText("/run/secrets/monarch_account_number").Trim();
+        var accountIdText = File.ReadAllText("/run/secrets/newrelic_account_number").Trim();
         this.accountId = int.Parse(accountIdText);
         this.apiKey = File.ReadAllText("/run/secrets/monarch_newrelic_api_key").Trim();
         this.monapiKey = File.ReadAllText("/run/secrets/monarch_sql_monapi_password").Trim();
@@ -124,7 +124,7 @@ public class NewRelicConnector
     /// <returns></returns>
     public async Task WriteToDatabase(List<NewRelicApp> apps)
     {     
-        var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={monapiKey};TrustServerCertificate=True;";
+        var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={monapiKey};TrustServerCertificate=False;";
         await using (var connection = new SqlConnection(connectionString))
         {
             await connection.OpenAsync();

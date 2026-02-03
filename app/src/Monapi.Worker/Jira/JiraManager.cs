@@ -78,7 +78,7 @@ public class JiraManager
     {
         try
         {
-            var connectionString = $"Server=sqlserver,1433;Database=monarch;User Id=monapi;Password={_sqlPassword};TrustServerCertificate=True;";
+            var connectionString = $"Server=sqlserver,1433;Database=monarch;User Id=monapi;Password={_sqlPassword};TrustServerCertificate=False;";
             
             using (var connection = new SqlConnection(connectionString))
             {
@@ -112,7 +112,7 @@ public class JiraManager
     {
         try
         {
-            var connectionString = $"Server=sqlserver,1433;Database=monarch;User Id=monapi;Password={_sqlPassword};TrustServerCertificate=True;";
+            var connectionString = $"Server=sqlserver,1433;Database=monarch;User Id=monapi;Password={_sqlPassword};TrustServerCertificate=False;";
             
             using (var connection = new SqlConnection(connectionString))
             {
@@ -194,7 +194,7 @@ public class JiraManager
                 return; // No open incident to close
             }
 
-            var connectionString = $"Server=sqlserver,1433;Database=monarch;User Id=monapi;Password={_sqlPassword};TrustServerCertificate=True;";
+            var connectionString = $"Server=sqlserver,1433;Database=monarch;User Id=monapi;Password={_sqlPassword};TrustServerCertificate=False;";
             
             using (var connection = new SqlConnection(connectionString))
             {
@@ -236,7 +236,7 @@ public class JiraManager
     {
         try
         {
-            var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={_sqlPassword};TrustServerCertificate=True;";
+            var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={_sqlPassword};TrustServerCertificate=False;";
             
             using (var connection = new SqlConnection(connectionString))
             {
@@ -272,7 +272,7 @@ public class JiraManager
     {
         try
         {
-            var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={_sqlPassword};TrustServerCertificate=True;";
+            var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={_sqlPassword};TrustServerCertificate=False;";
             
             using (var connection = new SqlConnection(connectionString))
             {

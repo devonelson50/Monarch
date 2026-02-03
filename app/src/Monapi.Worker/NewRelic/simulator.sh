@@ -7,7 +7,7 @@
 #!/bin/bash
 
 #Finds secret files
-ACCOUNT_FILE="/run/secrets/monarch_account_number"
+ACCOUNT_FILE="/run/secrets/newrelic_account_number"
 LICENSE_FILE="/run/secrets/monarch_simulator_api_key"
 
 #Reads secret files

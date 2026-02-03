@@ -61,7 +61,6 @@ public class Worker : BackgroundService
             }
             
             Console.WriteLine($"{DateTime.Now:HH:mm:ss} - Refreshing NewRelic data");
-            nrs.RunLoop();
 
             // Check for status changes and trigger Jira tickets
             await MonitorStatusChanges();
@@ -127,7 +126,7 @@ public class Worker : BackgroundService
         try
         {
             var sqlPassword = File.ReadAllText("/run/secrets/monarch_sql_monapi_password").Trim();
-            var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={sqlPassword};TrustServerCertificate=True;";
+            var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={sqlPassword};TrustServerCertificate=False;";
 
             using (var connection = new SqlConnection(connectionString))
             {
@@ -139,9 +138,9 @@ public class Worker : BackgroundService
                 {
                     while (await reader.ReadAsync())
                     {
-                        var appId = reader.GetString(0);
+                        var appId = reader.GetInt32(0).ToString();
                         var appName = reader.GetString(1);
-                        var currentStatus = reader.GetString(2);
+                        var currentStatus = reader.GetInt32(2).ToString();
 
                         // Check if status has changed
                         if (_previousStatuses.TryGetValue(appId, out var previousStatus))

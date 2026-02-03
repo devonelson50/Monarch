@@ -88,18 +88,18 @@ Monarch Dashboard Page
                 {
                     while (await reader.ReadAsync())
                     {
-                        var statusString = reader.GetString(2);
+                        var statusString = reader.GetInt32(2);
                         var statusType = statusString switch
                         {
-                            "Operational" => StatusType.Operational,
-                            "Degraded" => StatusType.DegradedPerformance,
-                            "Down" => StatusType.Outage,
+                            0 => StatusType.Operational,
+                            1 => StatusType.DegradedPerformance,
+                            2 => StatusType.Outage,
                             _ => StatusType.Unknown
                         };
 
                         apps.Add(new ApplicationStatus
                         {
-                            Id = reader.GetString(0),
+                            Id = reader.GetInt32(0).ToString(),
                             Name = reader.GetString(1),
                             Status = statusType
                         });
