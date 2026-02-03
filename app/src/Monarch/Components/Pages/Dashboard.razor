@@ -67,7 +67,7 @@
         try
         {
             var password = System.IO.File.ReadAllText("/run/secrets/monarch_sql_monarch_password");
-            var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monarch;Password={password};TrustServerCertificate=True;";
+            var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monarch;Password={password};Encrypt=True;TrustServerCertificate=False;";
             
             var apps = new List<ApplicationStatus>();
             

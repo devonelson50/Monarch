@@ -5,13 +5,27 @@
 # Microsoft SQL Server container entrypoint script.
 #
 # This script will:
-#       - retrieve any credentials passed via Docker Secrets.
+#       - Enable TLS, provide service with certificate signed by mon-ca, and private key
+#       - Require TLS 1.2 with known-vulnerable cipher suites disabled (TLS 1.3 not supported by image)
+#       - Ensure sqlmcd references the client bundle to ensure even calls from localhost
+#         validated against the certificate signed by mon-ca
+#       - Retrieve any credentials passed via Docker Secrets.
 #       - Call the sqlservr service in the background
-#       - await the sqlservr service
+#       - Await the sqlservr service
 #       - Connect to SQL server, and execute setup.sql
 #       - wait the sqlservr service's PID to keep the container running
 
 echo "Running initdb.sh."
+
+# Container will log:
+# SQL Server needs to be restarted in order to apply this setting. Please run 'systemctl restart mssql-server.service'.
+# This can be ignored since the service has not been called yet
+/opt/mssql/bin/mssql-conf set network.tlscert /certificate/cert.crt
+/opt/mssql/bin/mssql-conf set network.tlskey /certificate/key.crt
+/opt/mssql/bin/mssql-conf set network.forceencryption 1
+/opt/mssql/bin/mssql-conf set network.tlsprotocols 1.2
+/opt/mssql/bin/mssql-conf set network.tlsciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384'
+export SSL_CERT_FILE=/certificate/client_bundle.crt
 
 SA_PATH="/run/secrets/monarch_sql_sa_password"
 MONARCH_PATH="/run/secrets/monarch_sql_monarch_password"
@@ -58,8 +72,8 @@ DBSTATUS=1
 i=0
 
 while [[ $DBSTATUS -ne 0 ]] && [[ $i -lt 60 ]]; do
-	i=$i+1
-	DBSTATUS=$(/opt/mssql-tools18/bin/sqlcmd -N -C -h -1 -t 1 -U SA -P "$SA_PASSWORD" -Q "SET NOCOUNT ON; Select SUM(state) from sys.databases")
+	i=$(($i+1))
+	DBSTATUS=$(/opt/mssql-tools18/bin/sqlcmd -N -h -1 -t 1 -U SA -P "$SA_PASSWORD" -Q "SET NOCOUNT ON; Select SUM(state) from sys.databases")
 	sleep 1
     echo "SQL Server is starting..."
 done
@@ -71,8 +85,8 @@ if [[ $DBSTATUS -ne 0 ]]; then
 fi
 
 echo "SQL Server is started. Running setup.sql."
-/opt/mssql-tools18/bin/sqlcmd -N -C \
-    -S 127.0.0.1,1433 \
+/opt/mssql-tools18/bin/sqlcmd -N \
+    -S sqlserver \
     -U SA \
     -P "$SA_PASSWORD" \
     -d master \

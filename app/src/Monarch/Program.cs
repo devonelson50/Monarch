@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.AspNetCore.Antiforgery;
+using System.Security.Cryptography.X509Certificates;
 
 /// Devon Nelson
 /// Blazor WebApp entrypoint accomplishes the following:
@@ -57,11 +58,11 @@ builder.Services.AddAuthentication(options =>
     options.Authority = authority;
     options.ClientId = clientId;
     options.ClientSecret = clientSecret;
-    options.RequireHttpsMetadata = false;
+    options.RequireHttpsMetadata = true; 
     options.ConfigurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(
         $"{authority}/.well-known/openid-configuration",
         new OpenIdConnectConfigurationRetriever(),
-        new HttpDocumentRetriever(httpClient) { RequireHttps = false }
+        new HttpDocumentRetriever(httpClient) { RequireHttps = true }
     );
     options.ResponseType = OpenIdConnectResponseType.Code;
     options.SaveTokens = true;

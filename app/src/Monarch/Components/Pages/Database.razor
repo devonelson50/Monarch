@@ -35,7 +35,7 @@ else
     private async Task LoadAppsAsync()
     {
         string password = File.ReadAllText("/run/secrets/monarch_sql_monarch_password");      
-        var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monarch;Password={password};TrustServerCertificate=True;";
+        var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monarch;Password={password};Encrypt=True;TrustServerCertificate=False;";
         var result = new List<AppInfo>();
 
         using (var connection = new SqlConnection(connectionString))
