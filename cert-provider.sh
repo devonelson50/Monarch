@@ -1,0 +1,70 @@
+#!/bin/sh
+
+# Devon Nelson
+#
+# Self-signed certificate manager.
+#
+# This script will:
+#       - Await mon-ca, then retrieve the root certificate fingerprint using a shared 
+#         volume to establish initial trust between mon-ca and monarch-certificate-provider
+#       - Generate unique certificates for each service in container stack, the
+#         following is provided to each container:
+#               - root_ca.crt: certificate identifying mon-ca to be used as a trusted 
+#                              root certificate. Contains root and intermediate certificates.
+#               - cert.crt: this can be used by the listening service to establish trust
+#                           for any client that trusts mon-ca as a certificate authority
+#               - key.crt: service's certificate private key, corresponds with cert.crt
+#               - client_bundle.crt: cert.crt and root_ca.crt are combined to form a full-chain
+#                                    certificate. This was necessary for sqlcmd to establish 
+#                                    trust in local calls on sqlserver during initialization.
+#       - Write the certificates to shared volumes. These volumes are each accessible only by 
+#         monarch-certificate-provider, and the container for which the certificate has been issued.
+#         This ensures containers cannot access each other's private keys.
+#       - Set ownership to match the default user for each service
+#
+# Additional Notes:
+#       - Certificates expire after 24H, as this is the maximum default expiration accepted by step-ca
+#       - To renew and apply certificates, the container stack must be restarted
+#       - No additional steps should be needed to renew certificates other than a restart
+#       - Once this script has completed, the monarch-certificate-provider container will stop,
+#         ensuring no single running container has perpetual access to all private keys after 
+#         initialization.
+#
+# Smallstep CA and CLI documentation:
+#       - https://smallstep.com/docs/step-ca/
+#       - https://smallstep.com/docs/step-cli/reference/ca/certificate/
+
+echo "Waiting for mon-ca..."
+until curl -fk https://mon-ca:9000/health | grep -q 'ok'; do
+    sleep 1
+done
+
+CA=$(step certificate fingerprint /mon-ca_config/certs/root_ca.crt)
+step ca bootstrap --ca-url https://mon-ca:9000 --fingerprint "$CA" --force
+
+get_cert() {
+    NAME=$1; DIR=$2; OWNERID=$3
+    echo "Preparing certificates for $NAME..."
+
+    # Generate the certificate and private key for the current service,
+    # place in shared volume
+    step ca certificate "$NAME" "$DIR/cert.crt" "$DIR/key.crt" --provisioner-password-file /run/secrets/mon-ca_key --kty EC --not-after 24h --force
+
+    # Copy root/intermediate certificate to each volume, create the client bundle
+    cp /mon-ca_config/certs/root_ca.crt "$DIR/root_ca.crt"
+    cat "$DIR/cert.crt" "$DIR/root_ca.crt" > "$DIR/client_bundle.crt"
+    
+    # Configure ownership and permissions for public/private certs
+    chown -R "$OWNERID:0" "$DIR"
+    chmod 644 "$DIR/cert.crt" "$DIR/root_ca.crt" "$DIR/client_bundle.crt"
+    chmod 600 "$DIR/key.crt"
+}
+
+# Generate certificates and private keys for each container
+# Set the user for each container's entrypoint as the owner
+get_cert "sqlserver" "/certificates/sql" 10001
+get_cert "monarch" "/certificates/monarch" 1654
+get_cert "keycloak" "/certificates/keycloak" 1000
+get_cert "monapi" "/certificates/monapi" 1654
+
+echo "Certificate generation completed. Exiting."
