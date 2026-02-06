@@ -13,12 +13,28 @@
 #       - SQL databases
 #       - KeyCloak realm configuration
 #       - Initialization scripts
+#       - Certificates signed by mon-ca
 #   - Secrets management via Docker Secrets
 #       - text files are used for testing and development, these have been included in
 #         .gitignore
 #       - In production, external flags will be set to allow secure secret injection
 #   - Service health checks to prevent premature database calls
 #   - Environment variables
+#   - Certificate signing solution
+#       - Ensures traffic in the docker network is encrypted
+#       - Certificates are not trusted by default, but rather by verifying signature from
+#         the included certificate authority
+#       - The certificate provider establishes a connection to mon-ca through its own docker
+#         network. After the certificate for each service in the stack has been retrieved by the 
+#         provider, it is placed in separate volumes configured for each service. This ensures 
+#         each service has access to only its own certificate and key (as well as the necessary 
+#         certificate to establish trust with the certificate authority.
+#       - monarch-certificate-provider was introduced to minimize non-standard/unique configuration in each
+#         container. With this method, each service only needs to reference its certificate and key without
+#         any concern for retrieving it.
+#       - Interally signed certificates will have an expiration of 24 hours from initial signing. To renew the
+#         certificates, the entire stack should be restarted to allow monarch-certificate-provider to step through
+#         the signing and distribution process again.
 
 services:
   monarch:
@@ -27,10 +43,18 @@ services:
       context: .
       dockerfile: app/src/Monarch/Dockerfile
     ports:
-      - 8080:8080
+      - 443:8443
+    environment:
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /certificate/cert.crt
+      ASPNETCORE_Kestrel__Certificates__Default__KeyPath: /certificate/key.crt
+      SSL_CERT_FILE: /certificate/client_bundle.crt
     depends_on:
       sqlserver:
         condition: service_healthy
+      monarch-certificate-provider:
+        condition: service_completed_successfully
+    volumes:
+      - monarch_certificate:/certificate
     secrets:
       - monarch_sql_monarch_password
       - monarch_oidc_client_secret
@@ -42,6 +66,10 @@ services:
     depends_on:
       sqlserver:
         condition: service_healthy
+      monarch-certificate-provider:
+        condition: service_completed_successfully
+    volumes:
+      - monapi_certificate:/certificate
     secrets:
       - monarch_sql_monapi_password
       - monarch_newrelic_api_key
@@ -51,21 +79,26 @@ services:
       - monarch_simulator_api_key
     environment:
       nagios_uri: https://nxi.455garage.com/nagiosxi/ # 1:1 match with external URL in General Program Settings
+      SSL_CERT_FILE: /certificate/client_bundle.crt
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
+    hostname: sqlserver
+    extra_hosts:
+      - "sqlserver:127.0.0.1"
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD_FILE: /run/secrets/monarch_sql_sa_password
-      # MSSQL_TLS_CERT:
-      # MSSQL_TLS_KEY:
-      # MSSQL_TLS_PROTOCOLS: 1.2,1.3
     ports:
       - 1433:1433
     volumes:
       - sqlserverdata:/var/opt/mssql
+      - sql_certificate:/certificate
       - ./initdb/setup.sql:/usr/config/setup.sql
       - ./initdb/initdb.sh:/usr/config/initdb.sh
     command: /bin/bash -c "./usr/config/initdb.sh"
+    depends_on:
+      monarch-certificate-provider:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -N -C -h -1 -t 1 -U SA -P \"$(cat /run/secrets/monarch_sql_sa_password)\" -Q \"SET NOCOUNT ON; SELECT SUM(state) FROM sys.databases\" | tr -d ' \\r\\n' | grep -q '^0$'"]
       interval: 5s
@@ -79,24 +112,73 @@ services:
     image: quay.io/keycloak/keycloak:latest
     environment:
       KC_DB: mssql
-      KC_DB_URL: jdbc:sqlserver://sqlserver:1433;databaseName=keycloak;encrypt=false;trustServerCertificate=true;
+      KC_DB_URL: jdbc:sqlserver://sqlserver:1433;databaseName=keycloak;encrypt=true;trustServerCertificate=true;
       KC_DB_USERNAME: keycloak
       KC_HTTP_ENABLED: 'true'
       KC_PROXY: 'edge' 
       KC_HOSTNAME_STRICT: 'false'
+      KC_TLS_ENABLED: 'true'
+      KC_HTTPS_CERTIFICATE_FILE: /certificate/cert.crt
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /certificate/key.crt
     entrypoint: /bin/bash
     command: -c "export KC_DB_PASSWORD=$(cat /run/secrets/monarch_sql_keycloak_password) && /opt/keycloak/bin/kc.sh import --file /opt/keycloak/data/import/realm.json && /opt/keycloak/bin/kc.sh start-dev"
     ports:
-      - 8081:8080
+      - 8443:8443
     volumes:
       - ./keycloak/realm.json:/opt/keycloak/data/import/realm.json
+      - keycloak_certificate:/certificate
     depends_on:
       sqlserver:
         condition: service_healthy
+      monarch-certificate-provider:
+        condition: service_completed_successfully
     secrets:
       - monarch_sql_keycloak_password
+  mon-ca:
+    image: smallstep/step-ca
+    networks:
+      - ca-net
+    healthcheck:
+      test: ["CMD", "curl", "-fk", "https://localhost:9000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes: 
+      - mon-ca_config:/home/step
+    environment:
+      DOCKER_STEPCA_INIT_NAME: "MON-CA"
+      DOCKER_STEPCA_INIT_DNS_NAMES: "mon-ca"
+      DOCKER_STEPCA_INIT_PASSWORD_FILE: /run/secrets/mon-ca_key
+    secrets:
+      - mon-ca_key
+  monarch-certificate-provider:
+    image: smallstep/step-cli
+    networks:
+      - ca-net
+    depends_on:
+      mon-ca:
+        condition: service_healthy
+    volumes:
+      - ./cert-provider.sh:/usr/local/bin/cert-provider.sh
+      - mon-ca_config:/mon-ca_config
+      - sql_certificate:/certificates/sql
+      - monarch_certificate:/certificates/monarch
+      - keycloak_certificate:/certificates/keycloak
+      - monapi_certificate:/certificates/monapi
+    secrets:
+      - mon-ca_key
+    user: root
+    command: /bin/bash -c "/usr/local/bin/cert-provider.sh"
+networks:
+  ca-net:
+    internal: true
 volumes:
   sqlserverdata:
+  mon-ca_config:
+  sql_certificate:
+  monarch_certificate:
+  keycloak_certificate:
+  monapi_certificate:
 secrets:
   monarch_sql_sa_password:
     # external: true
@@ -127,6 +209,9 @@ secrets:
     file: ./.credentials/oidc_client_secret.txt # development only
   newrelic_account_number: 
     # external: true
-  file: ./.credentials/newrelic_account_number.txt # development only
+    file: ./.credentials/newrelic_account_number.txt # development only
   monarch_simulator_api_key: # development only
     file: ./.credentials/monarch_simulator_api_key.txt
+  mon-ca_key:
+    # external: true
+    file: ./.credentials/mon-ca_key.txt # development only

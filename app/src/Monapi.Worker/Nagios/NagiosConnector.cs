@@ -80,7 +80,7 @@ public class NagiosConnector
         // Attempt to update an existing line, if no changes are made by the update query, prepare an insert query.
         // This replaces the prototype's logic, which would delete all rows and re-insert, causing very short periods of time
         // in which the table would be empty or re-populating. 
-        await using (var sqlConnection = new SqlConnection($"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={monapiKey};TrustServerCertificate=True;"))
+        await using (var sqlConnection = new SqlConnection($"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={monapiKey};TrustServerCertificate=False;"))
         {
             await sqlConnection.OpenAsync();
             JsonNode jNode = JsonNode.Parse(response.Content);

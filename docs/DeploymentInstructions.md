@@ -6,6 +6,7 @@
     - [Outbound Connectivity Requirements](#outbound-connectivity-requirements)
       - [Monapi Service Worker Container](#monapi-service-worker-container)
     - [Inbound Connectivity Requirements](#inbound-connectivity-requirements)
+      - [Reverse Proxy Recommendations](#reverse-proxy-recommendations)
   - [Container Stack Configuration](#container-stack-configuration)
     - [Environment Variables](#environment-variables)
       - [monapi-worker: nagios\_uri](#monapi-worker-nagios_uri)
@@ -29,6 +30,14 @@
 #### Monapi Service Worker Container
 
 ### Inbound Connectivity Requirements
+
+#### Reverse Proxy Recommendations
+Expand on these points:
+
+Suggest including reverse proxy in container stack
+
+Suggest ensuring the reverse proxy trusts mon-ca to allow
+end to end encryption with full chain of trust
 
 ## Container Stack Configuration
 
