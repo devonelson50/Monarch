@@ -127,6 +127,6 @@ secrets:
     file: ./.credentials/oidc_client_secret.txt # development only
   newrelic_account_number: 
     # external: true
-  file: ./.credentials/newrelic_account_number.txt # development only
+    file: ./.credentials/newrelic_account_number.txt # development only
   monarch_simulator_api_key: # development only
     file: ./.credentials/monarch_simulator_api_key.txt

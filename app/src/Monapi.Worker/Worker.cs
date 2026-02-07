@@ -61,7 +61,6 @@ public class Worker : BackgroundService
             }
             
             Console.WriteLine($"{DateTime.Now:HH:mm:ss} - Refreshing NewRelic data");
-            nrs.RunLoop();
 
             // Check for status changes and trigger Jira tickets
             await MonitorStatusChanges();

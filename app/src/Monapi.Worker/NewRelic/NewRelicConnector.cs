@@ -21,7 +21,7 @@ public class NewRelicConnector
 
     public NewRelicConnector()
     {
-        var accountIdText = File.ReadAllText("/run/secrets/monarch_account_number").Trim();
+        var accountIdText = File.ReadAllText("/run/secrets/newrelic_account_number").Trim();
         this.accountId = int.Parse(accountIdText);
         this.apiKey = File.ReadAllText("/run/secrets/monarch_newrelic_api_key").Trim();
         this.monapiKey = File.ReadAllText("/run/secrets/monarch_sql_monapi_password").Trim();
@@ -104,7 +104,7 @@ public class NewRelicConnector
                         AppId = Convert.ToInt32(double.Parse(result["id"]?.ToString() ?? "0")),
                         IpAddress = result["ip"]?.ToString() ?? "0.0.0.0",
                         Status = Convert.ToInt32(double.Parse(result["state"]?.ToString() ?? "0")),
-                        Latency = Convert.ToInt32(result["lat"]?.ToString() ?? "0"),
+                        Latency = Convert.ToInt32(double.Parse(result["lat"]?.ToString() ?? "0")),
                         CpuUsage = double.Parse(result["cpu"]?.ToString() ?? "0.0"),
                         Throughput = Convert.ToInt32(double.Parse(result["tput"]?.ToString() ?? "0")),
                         Output = result["msg"]?.ToString() ?? "",
