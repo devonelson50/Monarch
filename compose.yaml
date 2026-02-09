@@ -77,8 +77,12 @@ services:
       - monarch_jira_api_key
       - newrelic_account_number
       - monarch_simulator_api_key
+      - monarch_kafka_password
     environment:
       nagios_uri: https://nxi.455garage.com/nagiosxi/ # 1:1 match with external URL in General Program Settings
+      kafka_server: kafka
+      kafka_port: 9092
+      kafka_user:
       SSL_CERT_FILE: /certificate/client_bundle.crt
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
@@ -215,3 +219,6 @@ secrets:
   mon-ca_key:
     # external: true
     file: ./.credentials/mon-ca_key.txt # development only
+  monarch_kafka_password:
+    # external: true
+    file: ./.credentials/monarch_kafka_password.txt
