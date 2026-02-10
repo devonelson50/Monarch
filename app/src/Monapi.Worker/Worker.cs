@@ -7,7 +7,8 @@ using Monapi.Worker.Kafka;
 
 namespace Monapi.Worker;
 /// <summary>
-/// Devon Nelson 
+/// All team members
+///  
 /// Primary loop for the service worker. For prototyping purposes, it will
 /// refresh simulated New Relic data from NewRelicSimulator every 30 seconds
 /// </summary>
@@ -155,14 +156,8 @@ public class Worker : BackgroundService
                                 );
 
 
-                                var currentStatusString = currentStatus switch
-                                {
-                                    "0" => "operational",
-                                    "1" => "degraded",
-                                    "2" => "down",
-                                    _ => "unknown"
-                                };
-                                kfc.WriteMessage(appName,currentStatusString);
+
+                                kfc.WriteMessage(appName,currentStatus, previousStatus);
                             }
                         }
 
