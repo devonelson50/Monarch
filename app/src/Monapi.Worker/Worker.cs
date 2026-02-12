@@ -3,10 +3,12 @@ using System.Diagnostics;
 using Monapi.Worker.Jira;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
+using Monapi.Worker.Kafka;
 
 namespace Monapi.Worker;
 /// <summary>
-/// Devon Nelson 
+/// All team members
+///  
 /// Primary loop for the service worker. For prototyping purposes, it will
 /// refresh simulated New Relic data from NewRelicSimulator every 30 seconds
 /// </summary>
@@ -17,6 +19,7 @@ public class Worker : BackgroundService
     private readonly IConfiguration _configuration;
     private JiraManager? _jiraManager;
     private Dictionary<string, string> _previousStatuses = new Dictionary<string, string>();
+    private KafkaConnector kfc;
 
     public Worker(ILogger<Worker> logger, IConfiguration configuration)
     {
@@ -42,6 +45,10 @@ public class Worker : BackgroundService
 
         Nagios.NagiosConnector nc = new Nagios.NagiosConnector();
         NewRelic.NewRelicConnector nrc = new NewRelic.NewRelicConnector();
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("kafka_server")))
+        {
+            this.kfc = new Kafka.KafkaConnector();
+        }
         
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -65,8 +72,6 @@ public class Worker : BackgroundService
             // Check for status changes and trigger Jira tickets
             await MonitorStatusChanges();
 
-            Console.WriteLine($"{DateTime.Now:HH:mm:ss} - Refreshing Nagios data");
-            nc.RunConnector();
             await Task.Delay(30000, stoppingToken);
         }
 
@@ -118,11 +123,6 @@ public class Worker : BackgroundService
     /// </summary>
     private async Task MonitorStatusChanges()
     {
-        if (_jiraManager == null)
-        {
-            return; // Jira integration not available
-        }
-
         try
         {
             var sqlPassword = File.ReadAllText("/run/secrets/monarch_sql_monapi_password").Trim();
@@ -148,18 +148,18 @@ public class Worker : BackgroundService
                             if (previousStatus != currentStatus)
                             {
                                 Console.WriteLine($"📊 Status change detected: {appName} ({previousStatus} → {currentStatus})");
-                                
+
                                 // For now, always create Jira tickets (later we'll check jiraAlert flag)
                                 await _jiraManager.HandleStatusChange(
-                                    appId, 
-                                    appName, 
-                                    previousStatus, 
-                                    currentStatus, 
+                                    appId,
+                                    appName,
+                                    previousStatus,
+                                    currentStatus,
                                     shouldCreateTicket: true
                                 );
+                                kfc?.WriteMessage(appName,currentStatus, previousStatus);
                             }
                         }
-
                         // Update previous status
                         _previousStatuses[appId] = currentStatus;
                     }
