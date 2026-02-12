@@ -38,6 +38,12 @@ StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configurat
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Register Slack Admin Service for admin panel
+builder.Services.AddSingleton<Monarch.Services.SlackAdminService>();
+
+// Register App Admin Service for application configuration management
+builder.Services.AddSingleton<Monarch.Services.AppAdminService>();
+
 // enable forwarding to support traefik reverse proxy
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {

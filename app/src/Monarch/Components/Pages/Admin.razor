@@ -1,12 +1,19 @@
 @*
-Conner Hammonds
+Conner Hammonds / Devon Nelson
 Monarch Admin Page
- - Sample admin console page with placeholder content
- - Not currently being used but still here in case needed later
+ - Google form style app configuration
+ - Select or create an application
+ - Connect New Relic and Nagios monitoring APIs
+ - Assign Jira workspaces and Slack channels
+ - Confirm and save changes to the database
 *@
 
 @page "/admin"
 @using Monarch.Components
+@using Monarch.Models
+@using Monarch.Services
+@inject AppAdminService AppService
+@inject SlackAdminService SlackService
 @rendermode InteractiveServer
 
 <PageTitle>Admin Console - Monarch</PageTitle>
@@ -15,20 +22,770 @@ Monarch Admin Page
 
 <div class="admin-page">
     <h1>Admin Console</h1>
-    <!-- Admin console content will go here -->
+    <p class="admin-subtitle">Configure application monitoring integrations and notification routing.</p>
+
+    <!-- STEP 1: Select or Create Application -->
+    <div class="form-section">
+        <div class="section-number">1</div>
+        <div class="section-content">
+            <h2>Select Application</h2>
+            <p class="section-description">Choose an existing application to configure, or create a new one.</p>
+
+            <div class="form-group">
+                <label>Application</label>
+                <div class="app-select-row">
+                    <select @bind="selectedAppId" @bind:after="OnAppSelected">
+                        <option value="0">-- Select an application --</option>
+                        @foreach (var app in monarchApps)
+                        {
+                            <option value="@app.AppId">@app.AppName</option>
+                        }
+                    </select>
+
+                    @if (!showCreateForm)
+                    {
+                        <button class="btn-secondary" @onclick="ShowCreateForm">+ New App</button>
+                    }
+                </div>
+            </div>
+
+            @if (showCreateForm)
+            {
+                <div class="create-app-row">
+                    <input type="text" @bind="newAppName" placeholder="Enter new application name" />
+                    <button class="btn-primary" @onclick="CreateNewApp">Create</button>
+                    <button class="btn-secondary" @onclick="CancelCreate">Cancel</button>
+                </div>
+            }
+        </div>
+    </div>
+
+    @if (currentApp != null)
+    {
+        <!-- STEP 2: Connect New Relic -->
+        <div class="form-section">
+            <div class="section-number">2</div>
+            <div class="section-content">
+                <h2>New Relic Connection</h2>
+                <p class="section-description">Link this application to a New Relic monitored resource. The dropdown shows applications discovered by the New Relic API connector.</p>
+
+                <div class="form-group">
+                    <label>New Relic Application</label>
+                    <select @bind="currentApp.NewRelicId">
+                        <option value="">-- None (not monitored) --</option>
+                        @foreach (var nrApp in discoveredNewRelicApps)
+                        {
+                            <option value="@nrApp.AppId">@nrApp.AppName (@nrApp.Status)</option>
+                        }
+                    </select>
+                </div>
+
+                @if (!discoveredNewRelicApps.Any())
+                {
+                    <p class="info-message">No New Relic applications have been discovered yet. Ensure the monapi-worker is running and the New Relic API key is configured in Docker secrets.</p>
+                }
+            </div>
+        </div>
+
+        <!-- STEP 3: Connect Nagios -->
+        <div class="form-section">
+            <div class="section-number">3</div>
+            <div class="section-content">
+                <h2>Nagios Connection</h2>
+                <p class="section-description">Link this application to a Nagios monitored host. The dropdown shows hosts discovered by the Nagios API connector.</p>
+
+                <div class="form-group">
+                    <label>Nagios Host</label>
+                    <select @bind="currentApp.NagiosId">
+                        <option value="">-- None (not monitored) --</option>
+                        @foreach (var nagApp in discoveredNagiosApps)
+                        {
+                            <option value="@nagApp.AppId">@nagApp.AppName (@nagApp.Status)</option>
+                        }
+                    </select>
+                </div>
+
+                @if (!discoveredNagiosApps.Any())
+                {
+                    <p class="info-message">No Nagios hosts have been discovered yet. Ensure the monapi-worker is running and the Nagios API details (Hostname, ApiKey, TLS) are configured in Docker secrets.</p>
+                }
+            </div>
+        </div>
+
+        <!-- STEP 4: Jira Workspaces -->
+        <div class="form-section">
+            <div class="section-number">4</div>
+            <div class="section-content">
+                <h2>Jira Workspaces</h2>
+                <p class="section-description">Select which Jira workspaces should receive incident tickets for this application. You can select one or many.</p>
+
+                @if (jiraWorkspaces.Any())
+                {
+                    <div class="checkbox-list">
+                        @foreach (var workspace in jiraWorkspaces)
+                        {
+                            var isChecked = currentApp.SelectedJiraWorkspaces.Contains(workspace.WorkspaceKey);
+                            <label class="checkbox-item">
+                                <input type="checkbox" checked="@isChecked"
+                                    @onchange="(e) => ToggleJiraWorkspace(workspace.WorkspaceKey, (bool)(e.Value ?? false))" />
+                                <span class="checkbox-label-text">
+                                    <strong>@workspace.WorkspaceName</strong>
+                                    <span class="checkbox-detail">@workspace.BaseUrl (@workspace.WorkspaceKey)</span>
+                                </span>
+                            </label>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="info-message">No Jira workspaces have been configured yet. Add a workspace below.</p>
+                }
+
+                <div class="add-workspace-row">
+                    <input type="text" @bind="newJiraWorkspace.WorkspaceKey" placeholder="Project Key (e.g., MON)" />
+                    <input type="text" @bind="newJiraWorkspace.WorkspaceName" placeholder="Workspace Name" />
+                    <input type="text" @bind="newJiraWorkspace.BaseUrl" placeholder="Base URL (e.g., https://team.atlassian.net)" />
+                    <button class="btn-secondary" @onclick="AddJiraWorkspace">Add</button>
+                </div>
+
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" @bind="currentApp.JiraAlert" />
+                        Enable Jira ticket creation for this app
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 5: Slack Channels -->
+        <div class="form-section">
+            <div class="section-number">5</div>
+            <div class="section-content">
+                <h2>Slack Channels</h2>
+                <p class="section-description">Select which Slack channels should receive notifications for this application. You can select one or many.</p>
+
+                @if (slackChannels.Any())
+                {
+                    <div class="checkbox-list">
+                        @foreach (var channel in slackChannels)
+                        {
+                            var isChecked = currentApp.SelectedSlackChannels.Contains(channel.Key);
+                            <label class="checkbox-item">
+                                <input type="checkbox" checked="@isChecked"
+                                    @onchange="(e) => ToggleSlackChannel(channel.Key, (bool)(e.Value ?? false))" />
+                                <span class="checkbox-label-text">
+                                    <strong>@channel.ChannelName</strong>
+                                    <span class="checkbox-detail">@channel.Key @(channel.IsDefault ? "(default)" : "")</span>
+                                </span>
+                            </label>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="info-message">No Slack channels have been configured. Add channels in the Slack channel management section or the Slack admin config.</p>
+                }
+
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" @bind="currentApp.SlackAlert" />
+                        Enable Slack notifications for this app
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 6: Confirm & Save -->
+        <div class="form-section">
+            <div class="section-number">6</div>
+            <div class="section-content">
+                <h2>Review & Save</h2>
+                <p class="section-description">Review the configuration below and click save to apply changes.</p>
+
+                <div class="review-summary">
+                    <div class="review-row">
+                        <span class="review-label">Application</span>
+                        <span class="review-value">@currentApp.AppName</span>
+                    </div>
+                    <div class="review-row">
+                        <span class="review-label">New Relic</span>
+                        <span class="review-value">
+                            @if (!string.IsNullOrEmpty(currentApp.NewRelicId))
+                            {
+                                var nrApp = discoveredNewRelicApps.FirstOrDefault(a => a.AppId == currentApp.NewRelicId);
+                                @(nrApp != null ? $"{nrApp.AppName} ({nrApp.AppId})" : currentApp.NewRelicId)
+                            }
+                            else
+                            {
+                                <span class="not-configured">Not connected</span>
+                            }
+                        </span>
+                    </div>
+                    <div class="review-row">
+                        <span class="review-label">Nagios</span>
+                        <span class="review-value">
+                            @if (!string.IsNullOrEmpty(currentApp.NagiosId))
+                            {
+                                var nagApp = discoveredNagiosApps.FirstOrDefault(a => a.AppId == currentApp.NagiosId);
+                                @(nagApp != null ? $"{nagApp.AppName} ({nagApp.AppId})" : currentApp.NagiosId)
+                            }
+                            else
+                            {
+                                <span class="not-configured">Not connected</span>
+                            }
+                        </span>
+                    </div>
+                    <div class="review-row">
+                        <span class="review-label">Jira</span>
+                        <span class="review-value">
+                            @if (currentApp.SelectedJiraWorkspaces.Any())
+                            {
+                                @string.Join(", ", currentApp.SelectedJiraWorkspaces)
+                                @(currentApp.JiraAlert ? " (enabled)" : " (disabled)")
+                            }
+                            else
+                            {
+                                <span class="not-configured">No workspaces selected</span>
+                            }
+                        </span>
+                    </div>
+                    <div class="review-row">
+                        <span class="review-label">Slack</span>
+                        <span class="review-value">
+                            @if (currentApp.SelectedSlackChannels.Any())
+                            {
+                                @string.Join(", ", currentApp.SelectedSlackChannels)
+                                @(currentApp.SlackAlert ? " (enabled)" : " (disabled)")
+                            }
+                            else
+                            {
+                                <span class="not-configured">No channels selected</span>
+                            }
+                        </span>
+                    </div>
+                </div>
+
+                <div class="save-actions">
+                    <button class="btn-primary btn-large" @onclick="SaveConfiguration">Save Changes</button>
+                    <button class="btn-secondary" @onclick="ResetForm">Discard</button>
+                </div>
+
+                @if (!string.IsNullOrEmpty(saveStatus))
+                {
+                    <p class="@saveStatusClass">@saveStatus</p>
+                }
+            </div>
+        </div>
+    }
 </div>
+
+@code {
+    // Data collections
+    private List<MonarchApp> monarchApps = new();
+    private List<DiscoveredNewRelicApp> discoveredNewRelicApps = new();
+    private List<DiscoveredNagiosApp> discoveredNagiosApps = new();
+    private List<SlackChannel> slackChannels = new();
+    private List<JiraWorkspaceOption> jiraWorkspaces = new();
+
+    // Form state
+    private int selectedAppId = 0;
+    private MonarchApp? currentApp;
+    private bool showCreateForm = false;
+    private string newAppName = "";
+    private JiraWorkspaceOption newJiraWorkspace = new();
+
+    // Save feedback
+    private string saveStatus = "";
+    private string saveStatusClass = "status-message";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAllData();
+    }
+
+    /// <summary>
+    /// Loads all dropdown/list data from the database and services
+    /// </summary>
+    private async Task LoadAllData()
+    {
+        try
+        {
+            monarchApps = await AppService.GetAllAppsAsync();
+            discoveredNewRelicApps = await AppService.GetDiscoveredNewRelicAppsAsync();
+            discoveredNagiosApps = await AppService.GetDiscoveredNagiosAppsAsync();
+            slackChannels = SlackService.GetChannels();
+            jiraWorkspaces = await AppService.GetJiraWorkspacesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading admin data: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles app selection from the dropdown
+    /// </summary>
+    private async Task OnAppSelected()
+    {
+        saveStatus = "";
+        if (selectedAppId > 0)
+        {
+            currentApp = await AppService.GetAppByIdAsync(selectedAppId);
+        }
+        else
+        {
+            currentApp = null;
+        }
+    }
+
+    // ===== Create New App =====
+
+    private void ShowCreateForm()
+    {
+        showCreateForm = true;
+        newAppName = "";
+    }
+
+    private void CancelCreate()
+    {
+        showCreateForm = false;
+        newAppName = "";
+    }
+
+    private async Task CreateNewApp()
+    {
+        if (string.IsNullOrWhiteSpace(newAppName))
+            return;
+
+        try
+        {
+            var newId = await AppService.CreateAppAsync(newAppName.Trim());
+            showCreateForm = false;
+            newAppName = "";
+
+            // Reload apps list and select the new one
+            await LoadAllData();
+            selectedAppId = newId;
+            currentApp = await AppService.GetAppByIdAsync(newId);
+
+            saveStatus = $"Application '{currentApp?.AppName}' created successfully.";
+            saveStatusClass = "status-message status-success";
+        }
+        catch (Exception ex)
+        {
+            saveStatus = $"Error creating application: {ex.Message}";
+            saveStatusClass = "status-message status-error";
+        }
+    }
+
+    // ===== Multi-Select Toggles =====
+
+    private void ToggleSlackChannel(string channelKey, bool isChecked)
+    {
+        if (currentApp == null) return;
+
+        if (isChecked && !currentApp.SelectedSlackChannels.Contains(channelKey))
+        {
+            currentApp.SelectedSlackChannels.Add(channelKey);
+        }
+        else if (!isChecked)
+        {
+            currentApp.SelectedSlackChannels.Remove(channelKey);
+        }
+    }
+
+    private void ToggleJiraWorkspace(string workspaceKey, bool isChecked)
+    {
+        if (currentApp == null) return;
+
+        if (isChecked && !currentApp.SelectedJiraWorkspaces.Contains(workspaceKey))
+        {
+            currentApp.SelectedJiraWorkspaces.Add(workspaceKey);
+        }
+        else if (!isChecked)
+        {
+            currentApp.SelectedJiraWorkspaces.Remove(workspaceKey);
+        }
+    }
+
+    // ===== Add Jira Workspace =====
+
+    private async Task AddJiraWorkspace()
+    {
+        if (string.IsNullOrWhiteSpace(newJiraWorkspace.WorkspaceKey) ||
+            string.IsNullOrWhiteSpace(newJiraWorkspace.WorkspaceName) ||
+            string.IsNullOrWhiteSpace(newJiraWorkspace.BaseUrl))
+            return;
+
+        try
+        {
+            await AppService.AddJiraWorkspaceAsync(newJiraWorkspace);
+            newJiraWorkspace = new JiraWorkspaceOption();
+            jiraWorkspaces = await AppService.GetJiraWorkspacesAsync();
+        }
+        catch (Exception ex)
+        {
+            saveStatus = $"Error adding Jira workspace: {ex.Message}";
+            saveStatusClass = "status-message status-error";
+        }
+    }
+
+    // ===== Save & Reset =====
+
+    private async Task SaveConfiguration()
+    {
+        if (currentApp == null) return;
+
+        try
+        {
+            await AppService.UpdateAppAsync(currentApp);
+            saveStatus = $"Configuration for '{currentApp.AppName}' saved successfully. Changes will be reflected on the dashboard.";
+            saveStatusClass = "status-message status-success";
+
+            // Reload to reflect saved state
+            await LoadAllData();
+        }
+        catch (Exception ex)
+        {
+            saveStatus = $"Error saving configuration: {ex.Message}";
+            saveStatusClass = "status-message status-error";
+        }
+    }
+
+    private void ResetForm()
+    {
+        currentApp = null;
+        selectedAppId = 0;
+        saveStatus = "";
+        showCreateForm = false;
+    }
+}
 
 <style>
     .admin-page {
-        padding: 24px;
+        padding: 32px 48px;
         background-color: #2D2D2D;
         min-height: calc(100vh - 64px);
         color: #FFFFFF;
+        max-width: 900px;
+        margin: 0 auto;
     }
 
     .admin-page h1 {
-        font-size: 24px;
+        font-size: 28px;
         font-weight: 500;
-        margin: 0 0 24px 0;
+        margin: 0 0 4px 0;
+    }
+
+    .admin-subtitle {
+        color: #AAAAAA;
+        font-size: 14px;
+        margin: 0 0 32px 0;
+    }
+
+    /* ===== Form Section (numbered steps) ===== */
+
+    .form-section {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 28px;
+        padding-bottom: 28px;
+        border-bottom: 1px solid #444;
+    }
+
+    .form-section:last-of-type {
+        border-bottom: none;
+    }
+
+    .section-number {
+        flex-shrink: 0;
+        width: 36px;
+        height: 36px;
+        background-color: #0078D4;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        font-weight: 600;
+        color: #FFFFFF;
+        margin-top: 2px;
+    }
+
+    .section-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .section-content h2 {
+        font-size: 18px;
+        margin: 0 0 4px 0;
+        color: #FFFFFF;
+        font-weight: 500;
+    }
+
+    .section-description {
+        color: #AAAAAA;
+        font-size: 13px;
+        margin: 0 0 16px 0;
+        line-height: 1.4;
+    }
+
+    /* ===== Form Controls ===== */
+
+    .form-group {
+        margin-bottom: 16px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 6px;
+        color: #CCCCCC;
+        font-size: 14px;
+    }
+
+    .form-group select,
+    .form-group input[type="text"],
+    .form-group textarea {
+        width: 100%;
+        max-width: 500px;
+        padding: 10px 12px;
+        border: 1px solid #555;
+        border-radius: 6px;
+        background-color: #363636;
+        color: #FFFFFF;
+        font-size: 14px;
+        transition: border-color 0.2s;
+    }
+
+    .form-group select:focus,
+    .form-group input[type="text"]:focus {
+        border-color: #0078D4;
+        outline: none;
+    }
+
+    .app-select-row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .app-select-row select {
+        flex: 1;
+        max-width: 400px;
+        padding: 10px 12px;
+        border: 1px solid #555;
+        border-radius: 6px;
+        background-color: #363636;
+        color: #FFFFFF;
+        font-size: 14px;
+    }
+
+    .create-app-row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-top: 12px;
+    }
+
+    .create-app-row input {
+        flex: 1;
+        max-width: 300px;
+        padding: 10px 12px;
+        border: 1px solid #555;
+        border-radius: 6px;
+        background-color: #363636;
+        color: #FFFFFF;
+        font-size: 14px;
+    }
+
+    .add-workspace-row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+
+    .add-workspace-row input {
+        padding: 8px 10px;
+        border: 1px solid #555;
+        border-radius: 6px;
+        background-color: #363636;
+        color: #FFFFFF;
+        font-size: 13px;
+        flex: 1;
+        min-width: 140px;
+    }
+
+    /* ===== Checkbox Lists ===== */
+
+    .checkbox-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+
+    .checkbox-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 10px 14px;
+        background-color: #363636;
+        border: 1px solid #4A4A4A;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: border-color 0.2s;
+    }
+
+    .checkbox-item:hover {
+        border-color: #0078D4;
+    }
+
+    .checkbox-item input[type="checkbox"] {
+        margin-top: 3px;
+        accent-color: #0078D4;
+    }
+
+    .checkbox-label-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .checkbox-label-text strong {
+        font-size: 14px;
+        color: #FFFFFF;
+    }
+
+    .checkbox-detail {
+        font-size: 12px;
+        color: #999999;
+    }
+
+    .toggle-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #CCCCCC;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    .toggle-label input[type="checkbox"] {
+        accent-color: #0078D4;
+    }
+
+    /* ===== Review Summary ===== */
+
+    .review-summary {
+        background-color: #363636;
+        border: 1px solid #4A4A4A;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 20px;
+    }
+
+    .review-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #444;
+        font-size: 14px;
+    }
+
+    .review-row:last-child {
+        border-bottom: none;
+    }
+
+    .review-label {
+        color: #AAAAAA;
+        font-weight: 500;
+    }
+
+    .review-value {
+        color: #FFFFFF;
+        text-align: right;
+        max-width: 60%;
+    }
+
+    .not-configured {
+        color: #777777;
+        font-style: italic;
+    }
+
+    /* ===== Buttons ===== */
+
+    .btn-primary {
+        padding: 10px 20px;
+        background-color: #0078D4;
+        border: none;
+        color: #FFFFFF;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background-color 0.2s;
+    }
+
+    .btn-primary:hover {
+        background-color: #006CBD;
+    }
+
+    .btn-large {
+        padding: 12px 32px;
+        font-size: 15px;
+    }
+
+    .btn-secondary {
+        padding: 10px 20px;
+        background-color: #3D3D3D;
+        border: 1px solid #555;
+        color: #CCCCCC;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background-color 0.2s;
+    }
+
+    .btn-secondary:hover {
+        background-color: #4D4D4D;
+    }
+
+    .save-actions {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+    }
+
+    /* ===== Status & Info Messages ===== */
+
+    .info-message {
+        color: #88BBDD;
+        font-size: 13px;
+        padding: 10px 14px;
+        background-color: rgba(0, 120, 212, 0.1);
+        border: 1px solid rgba(0, 120, 212, 0.2);
+        border-radius: 6px;
+        margin-bottom: 12px;
+    }
+
+    .status-message {
+        margin-top: 16px;
+        padding: 12px 16px;
+        border-radius: 6px;
+        font-size: 14px;
+    }
+
+    .status-success {
+        background-color: #2D5A2D;
+        color: #90EE90;
+        border: 1px solid #3D7A3D;
+    }
+
+    .status-error {
+        background-color: #5A2D2D;
+        color: #EE9090;
+        border: 1px solid #7A3D3D;
     }
 </style>
