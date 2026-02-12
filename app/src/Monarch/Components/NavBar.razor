@@ -1,4 +1,5 @@
 @using Monarch.Models
+@using Monarch.Layout
 
 <nav class="navbar">
     <div class="navbar-content">
@@ -12,11 +13,11 @@
         </div>
 
         <div class="navbar-right">
-            @*(<button class="icon-btn" title="Add Application" aria-label="Add Application">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <button class="icon-btn" title="Add Application" aria-label="Add Application" @onclick="ToggleAddApp">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 50 50" fill="currentColor">
                     <path d="M 25 2 C 12.309295 2 2 12.309295 2 25 C 2 37.690705 12.309295 48 25 48 C 37.690705 48 48 37.690705 48 25 C 48 12.309295 37.690705 2 25 2 z M 25 4 C 36.609824 4 46 13.390176 46 25 C 46 36.609824 36.609824 46 25 46 C 13.390176 46 4 36.609824 4 25 C 4 13.390176 13.390176 4 25 4 z M 24 13 L 24 24 L 13 24 L 13 26 L 24 26 L 24 37 L 26 37 L 26 26 L 37 26 L 37 24 L 26 24 L 26 13 L 24 13 z"/>
                 </svg>
-            </button>*@
+            </button>
             <button class="icon-btn console-btn" title="Admin Console" aria-label="Admin Console" @onclick="ToggleAdmin">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                     <path
@@ -196,6 +197,7 @@ Mock admin card created
     </div>
 }
 
+<AddApplication IsVisible="showAddApp" OnClose="ToggleAddApp" />
 
 <style>
     .navbar {
@@ -292,6 +294,12 @@ Mock admin card created
         border-radius: 50%;
     }
 
+    .app-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+    }
+
     .admin-overlay {
     position: fixed;
     inset: 0;
@@ -367,6 +375,9 @@ Mock admin card created
 
     private NotificationSettings notifModel = new();
     private UserAppSelection userModel = new();
+
+    private bool showAddApp = false;
+    private void ToggleAddApp() => showAddApp = !showAddApp;
 
     private void SaveNotifications(){
 

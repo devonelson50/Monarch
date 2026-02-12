@@ -2,15 +2,18 @@
 
 services:
   monarch:
-    image: monarch
     build:
-      context: .
-      dockerfile: app/src/Monarch/Dockerfile
+      target: build 
       args:
         - configuration=Debug
-    ports:
-      - 8080:8080
     environment:
+      - DOTNET_WATCH_RELOAD_ON_FILE_CHANGE=1
+      - DOTNET_USE_POLLING_FILE_WATCHER=1
       - ASPNETCORE_ENVIRONMENT=Development
     volumes:
       - ~/.vsdbg:/remote_debugger:rw
+      - ./app/src/Monarch:/src/app/src/Monarch
+    working_dir: /src/app/src/Monarch
+    command: ["dotnet", "watch", "run", "--urls", "http://+:8080"]
+    ports:
+      - "8080:8080"

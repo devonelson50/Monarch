@@ -253,7 +253,7 @@ BEGIN
         nagiosId VARCHAR(100),
         appName VARCHAR(100) NOT NULL,
         status VARCHAR(100) NOT NULL,
-        mostRecentIndicentId VARCHAR(100),
+        mostRecentIncidentId VARCHAR(100),
         slackAlert BIT DEFAULT 0,
         jiraAlert BIT DEFAULT 0,
         smtpAlert BIT DEFAULT 0
