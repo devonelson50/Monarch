@@ -154,13 +154,12 @@ public class Worker : BackgroundService
                                     currentStatus,
                                     shouldCreateTicket: true
                                 );
-
-
-
-                                kfc.WriteMessage(appName,currentStatus, previousStatus);
+                                if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("kafka_server")))
+                                {
+                                    kfc.WriteMessage(appName,currentStatus, previousStatus);    
+                                }
                             }
                         }
-
                         // Update previous status
                         _previousStatuses[appId] = currentStatus;
                     }

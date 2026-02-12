@@ -80,8 +80,8 @@ services:
       - monarch_kafka_password
     environment:
       nagios_uri: https://nxi.455garage.com/nagiosxi/ # 1:1 match with external URL in General Program Settings
-      kafka_server: kafka
-      kafka_port: 9092
+      kafka_server:
+      kafka_port:
       kafka_user:
       SSL_CERT_FILE: /certificate/client_bundle.crt
   sqlserver:
