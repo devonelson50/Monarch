@@ -45,7 +45,10 @@ public class Worker : BackgroundService
 
         Nagios.NagiosConnector nc = new Nagios.NagiosConnector();
         NewRelic.NewRelicConnector nrc = new NewRelic.NewRelicConnector();
-        this.kfc = new Kafka.KafkaConnector();
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("kafka_server")))
+        {
+            this.kfc = new Kafka.KafkaConnector();
+        }
         
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -154,10 +157,7 @@ public class Worker : BackgroundService
                                     currentStatus,
                                     shouldCreateTicket: true
                                 );
-                                if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("kafka_server")))
-                                {
-                                    kfc.WriteMessage(appName,currentStatus, previousStatus);    
-                                }
+                                kfc?.WriteMessage(appName,currentStatus, previousStatus);
                             }
                         }
                         // Update previous status

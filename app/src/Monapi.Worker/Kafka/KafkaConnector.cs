@@ -20,6 +20,7 @@ public class KafkaConnector : IDisposable
     private IProducer<string, string> producer;
     public KafkaConnector()
     {
+        Console.WriteLine("Kafka configuration detected. Preparing connection...");
         // Retrieve configuration from environment variables, and Docker Secret
         //
         // Any below value being null or empty will cause an exception to be thrown. This
