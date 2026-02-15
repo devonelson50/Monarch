@@ -165,6 +165,7 @@ services:
       - monarch_certificate:/certificates/monarch
       - keycloak_certificate:/certificates/keycloak
       - monapi_certificate:/certificates/monapi
+      - ./monarch_root_ca.crt:/usr/local/bin/monarch_root_ca.crt
     secrets:
       - mon-ca_key
     user: root
