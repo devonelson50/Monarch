@@ -21,3 +21,4 @@ Thumbs.db
 *.FileListAbsolute.txt
 .credentials/
 .vs/
+monarch_root_ca.crt
