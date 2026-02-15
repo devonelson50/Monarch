@@ -88,8 +88,6 @@ services:
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD_FILE: /run/secrets/monarch_sql_sa_password
-    ports:
-      - 1433:1433
     volumes:
       - sqlserverdata:/var/opt/mssql
       - sql_certificate:/certificate
