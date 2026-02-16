@@ -4,10 +4,10 @@ namespace Monarch.Models
 {
         public enum StatusType
     {
-        Unknown = 3,
-        Operational = 2,
+        Operational = 0,
         DegradedPerformance = 1,
-        Outage = 0
+        Outage = 2,
+        Unknown = 3
     }
 
     public class AppModel

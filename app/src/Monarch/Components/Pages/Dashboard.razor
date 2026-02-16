@@ -67,7 +67,7 @@ Monarch Dashboard Page
         // Refresh data every 30 seconds to see live updates
         refreshTimer = new System.Threading.Timer(async _ =>
         {
-            await LoadApplicationsFromDatabase();
+            await RefreshApplications();
             await InvokeAsync(StateHasChanged);
         }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
@@ -88,6 +88,36 @@ Monarch Dashboard Page
             allApplications = new List<AppModel>();
             applications = new List<AppModel>();
             isLoading = false;
+        }
+    }
+
+    private async Task RefreshApplications()
+    {
+        if (allApplications == null || !allApplications.Any()) return;
+
+        try
+        {
+            var tasks = allApplications.Select(async app => 
+            {
+                try 
+                {
+                    return await Service.RefreshAppStatusAsync(app.AppId);
+                }
+                catch 
+                {
+                    return app; 
+                }
+            });
+
+            var refreshedApps = await Task.WhenAll(tasks);
+
+            allApplications = refreshedApps.ToList();
+            
+            ApplySort();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error during background refresh: {ex.Message}");
         }
     }
 

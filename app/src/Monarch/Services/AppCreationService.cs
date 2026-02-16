@@ -76,7 +76,7 @@ namespace Monarch.Services
           {
             results.Add(new NewRelicApp
             {
-              AppId = reader.GetString(0),
+              AppId = reader.GetInt32(0).ToString(),
               AppName = reader.GetString(1)
             });
           }
@@ -102,7 +102,7 @@ namespace Monarch.Services
           {
             results.Add(new NagiosApp
             {
-              AppId = reader.GetString(0),
+              AppId = reader.GetInt32(0).ToString(),
               AppName = reader.GetString(1)
             });
           }
@@ -253,6 +253,116 @@ namespace Monarch.Services
           }
         }
         return details;
+    }
+
+    public async Task<AppModel> RefreshAppStatusAsync(int appId)
+    {
+        string appName = "";
+        string? nrId = null;
+        string? nagiosId = null;
+
+        // --- STEP 1: Get App Config from MONARCH DB ---
+        using (var conn = new SqlConnection(_monarchConnectionString))
+        {
+            await conn.OpenAsync();
+            var sql = "SELECT appName, newRelicId, nagiosId FROM apps WHERE appId = @id";
+            
+            using (var cmd = new SqlCommand(sql, conn))
+            {
+                cmd.Parameters.AddWithValue("@id", appId);
+                using (var reader = await cmd.ExecuteReaderAsync())
+                {
+                    if (await reader.ReadAsync())
+                    {
+                        appName = reader["appName"].ToString();
+                        if (!reader.IsDBNull(reader.GetOrdinal("newRelicId")))
+                            nrId = reader["newRelicId"].ToString();
+                        if (!reader.IsDBNull(reader.GetOrdinal("nagiosId")))
+                            nagiosId = reader["nagiosId"].ToString();
+                    }
+                }
+            }
+        }
+
+        // --- STEP 2: Get Live Status from MONAPI DB ---
+        int nrStatus = -1;
+        int nagiosState = -1;
+
+        using (var conn = new SqlConnection(_monapiConnectionString))
+        {
+            await conn.OpenAsync();
+
+            // Check New Relic
+            if (!string.IsNullOrEmpty(nrId))
+            {
+                var sqlNr = "SELECT status FROM newRelicApps WHERE appId = @nrId";
+                using (var cmd = new SqlCommand(sqlNr, conn))
+                {
+                    // Ensure we pass the ID as the right type (int vs string)
+                    // Assuming your New Relic ID in Monapi is INT based on previous schema
+                    if (int.TryParse(nrId, out int nrIdInt))
+                    {
+                        cmd.Parameters.AddWithValue("@nrId", nrIdInt);
+                        var result = await cmd.ExecuteScalarAsync();
+                        if (result != null && result != DBNull.Value)
+                            nrStatus = Convert.ToInt32(result);
+                    }
+                }
+            }
+
+            // Check Nagios
+            if (!string.IsNullOrEmpty(nagiosId))
+            {
+                var sqlNagios = "SELECT currentState FROM nagiosApps WHERE hostObjectId = @nId";
+                using (var cmd = new SqlCommand(sqlNagios, conn))
+                {
+                    if (int.TryParse(nagiosId, out int nIdInt))
+                    {
+                        cmd.Parameters.AddWithValue("@nId", nIdInt);
+                        var result = await cmd.ExecuteScalarAsync();
+                        if (result != null && result != DBNull.Value)
+                            nagiosState = Convert.ToInt32(result);
+                    }
+                }
+            }
+        }
+
+        // --- STEP 3: Calculate Worst Case Logic (0=Good) ---
+        var newStatus = StatusType.Operational; 
+
+        // Check Nagios (0=OK, 1=Warn, 2=Crit)
+        if (nagiosState == 2) newStatus = StatusType.Outage;
+        else if (nagiosState == 1 && newStatus != StatusType.Outage) newStatus = StatusType.DegradedPerformance;
+
+        // Check New Relic (Assuming 0=Good, 2=Bad)
+        if (nrStatus >= 2) newStatus = StatusType.Outage;
+        else if (nrStatus == 1 && newStatus != StatusType.Outage) newStatus = StatusType.DegradedPerformance;
+
+
+        // --- STEP 4: Update MONARCH DB with new Status ---
+        using (var conn = new SqlConnection(_monarchConnectionString))
+        {
+            await conn.OpenAsync();
+            // Update the status column (Schema says it's VARCHAR)
+            var sqlUpdate = "UPDATE apps SET status = @s WHERE appId = @id";
+            
+            using (var cmd = new SqlCommand(sqlUpdate, conn))
+            {
+                // Convert Enum to Int String ("0", "1", "2")
+                cmd.Parameters.AddWithValue("@s", ((int)newStatus).ToString());
+                cmd.Parameters.AddWithValue("@id", appId);
+                await cmd.ExecuteNonQueryAsync();
+            }
+        }
+
+        return new AppModel 
+        { 
+            AppId = appId, 
+            AppName = appName, 
+            Status = newStatus,
+            NewRelicId = nrId,
+            NagiosId = nagiosId
+        };
     }
   }
 }
