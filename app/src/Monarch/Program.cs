@@ -38,6 +38,10 @@ StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configurat
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Register HttpClient for services that need it
+HttpClient httpClient = new HttpClient();
+builder.Services.AddSingleton(httpClient);
+
 // Register Slack Admin Service for admin panel
 builder.Services.AddSingleton<Monarch.Services.SlackAdminService>();
 
@@ -50,8 +54,6 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
 });
 
-HttpClient httpClient = new HttpClient();
-builder.Services.AddSingleton(httpClient);
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;

@@ -1,5 +1,5 @@
 @*
-Conner Hammonds / Devon Nelson
+Conner Hammonds
 Monarch Admin Page
  - Google form style app configuration
  - Select or create an application
@@ -62,59 +62,51 @@ Monarch Admin Page
 
     @if (currentApp != null)
     {
-        <!-- STEP 2: Connect New Relic -->
+        <!-- STEP 2: Monitoring Connections (auto-discovered) -->
         <div class="form-section">
             <div class="section-number">2</div>
             <div class="section-content">
-                <h2>New Relic Connection</h2>
-                <p class="section-description">Link this application to a New Relic monitored resource. The dropdown shows applications discovered by the New Relic API connector.</p>
+                <h2>Monitoring Connections</h2>
+                <p class="section-description">Monitoring sources are automatically discovered by the monapi-worker service. These connections are read-only.</p>
 
-                <div class="form-group">
-                    <label>New Relic Application</label>
-                    <select @bind="currentApp.NewRelicId">
-                        <option value="">-- None (not monitored) --</option>
-                        @foreach (var nrApp in discoveredNewRelicApps)
+                <div class="connection-display">
+                    <div class="connection-row">
+                        <span class="connection-label">New Relic</span>
+                        @if (!string.IsNullOrEmpty(currentApp.NewRelicId))
                         {
-                            <option value="@nrApp.AppId">@nrApp.AppName (@nrApp.Status)</option>
+                            var nrApp = discoveredNewRelicApps.FirstOrDefault(a => a.AppId == currentApp.NewRelicId);
+                            <span class="connection-value connected">
+                                @(nrApp != null ? $"{nrApp.AppName} ({nrApp.AppId})" : currentApp.NewRelicId)
+                                <span class="auto-badge">Auto-discovered</span>
+                            </span>
                         }
-                    </select>
+                        else
+                        {
+                            <span class="connection-value not-connected">Not linked</span>
+                        }
+                    </div>
+                    <div class="connection-row">
+                        <span class="connection-label">Nagios</span>
+                        @if (!string.IsNullOrEmpty(currentApp.NagiosId))
+                        {
+                            var nagApp = discoveredNagiosApps.FirstOrDefault(a => a.AppId == currentApp.NagiosId);
+                            <span class="connection-value connected">
+                                @(nagApp != null ? $"{nagApp.AppName} ({nagApp.AppId})" : currentApp.NagiosId)
+                                <span class="auto-badge">Auto-discovered</span>
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="connection-value not-connected">Not linked</span>
+                        }
+                    </div>
                 </div>
-
-                @if (!discoveredNewRelicApps.Any())
-                {
-                    <p class="info-message">No New Relic applications have been discovered yet. Ensure the monapi-worker is running and the New Relic API key is configured in Docker secrets.</p>
-                }
             </div>
         </div>
 
-        <!-- STEP 3: Connect Nagios -->
+        <!-- STEP 3: Jira Workspaces -->
         <div class="form-section">
             <div class="section-number">3</div>
-            <div class="section-content">
-                <h2>Nagios Connection</h2>
-                <p class="section-description">Link this application to a Nagios monitored host. The dropdown shows hosts discovered by the Nagios API connector.</p>
-
-                <div class="form-group">
-                    <label>Nagios Host</label>
-                    <select @bind="currentApp.NagiosId">
-                        <option value="">-- None (not monitored) --</option>
-                        @foreach (var nagApp in discoveredNagiosApps)
-                        {
-                            <option value="@nagApp.AppId">@nagApp.AppName (@nagApp.Status)</option>
-                        }
-                    </select>
-                </div>
-
-                @if (!discoveredNagiosApps.Any())
-                {
-                    <p class="info-message">No Nagios hosts have been discovered yet. Ensure the monapi-worker is running and the Nagios API details (Hostname, ApiKey, TLS) are configured in Docker secrets.</p>
-                }
-            </div>
-        </div>
-
-        <!-- STEP 4: Jira Workspaces -->
-        <div class="form-section">
-            <div class="section-number">4</div>
             <div class="section-content">
                 <h2>Jira Workspaces</h2>
                 <p class="section-description">Select which Jira workspaces should receive incident tickets for this application. You can select one or many.</p>
@@ -125,14 +117,18 @@ Monarch Admin Page
                         @foreach (var workspace in jiraWorkspaces)
                         {
                             var isChecked = currentApp.SelectedJiraWorkspaces.Contains(workspace.WorkspaceKey);
-                            <label class="checkbox-item">
-                                <input type="checkbox" checked="@isChecked"
-                                    @onchange="(e) => ToggleJiraWorkspace(workspace.WorkspaceKey, (bool)(e.Value ?? false))" />
-                                <span class="checkbox-label-text">
-                                    <strong>@workspace.WorkspaceName</strong>
-                                    <span class="checkbox-detail">@workspace.BaseUrl (@workspace.WorkspaceKey)</span>
-                                </span>
-                            </label>
+                            <div class="checkbox-item-with-button">
+                                <label class="checkbox-item">
+                                    <input type="checkbox" checked="@isChecked"
+                                        @onchange="(e) => ToggleJiraWorkspace(workspace.WorkspaceKey, (bool)(e.Value ?? false))" />
+                                    <span class="checkbox-label-text">
+                                        <strong>@workspace.WorkspaceKey</strong>
+                                        <span class="checkbox-detail">@workspace.BaseUrl</span>
+                                    </span>
+                                </label>
+                                <button class="btn-test" @onclick="() => SendTestTicket(workspace.WorkspaceKey)" 
+                                        disabled="@testTicketSending">Send Test Ticket</button>
+                            </div>
                         }
                     </div>
                 }
@@ -141,25 +137,22 @@ Monarch Admin Page
                     <p class="info-message">No Jira workspaces have been configured yet. Add a workspace below.</p>
                 }
 
+                @if (!string.IsNullOrEmpty(testTicketStatus))
+                {
+                    <p class="@testTicketStatusClass">@testTicketStatus</p>
+                }
+
                 <div class="add-workspace-row">
                     <input type="text" @bind="newJiraWorkspace.WorkspaceKey" placeholder="Project Key (e.g., MON)" />
-                    <input type="text" @bind="newJiraWorkspace.WorkspaceName" placeholder="Workspace Name" />
                     <input type="text" @bind="newJiraWorkspace.BaseUrl" placeholder="Base URL (e.g., https://team.atlassian.net)" />
                     <button class="btn-secondary" @onclick="AddJiraWorkspace">Add</button>
-                </div>
-
-                <div class="form-group">
-                    <label class="toggle-label">
-                        <input type="checkbox" @bind="currentApp.JiraAlert" />
-                        Enable Jira ticket creation for this app
-                    </label>
                 </div>
             </div>
         </div>
 
-        <!-- STEP 5: Slack Channels -->
+        <!-- STEP 4: Slack Channels -->
         <div class="form-section">
-            <div class="section-number">5</div>
+            <div class="section-number">4</div>
             <div class="section-content">
                 <h2>Slack Channels</h2>
                 <p class="section-description">Select which Slack channels should receive notifications for this application. You can select one or many.</p>
@@ -185,19 +178,12 @@ Monarch Admin Page
                 {
                     <p class="info-message">No Slack channels have been configured. Add channels in the Slack channel management section or the Slack admin config.</p>
                 }
-
-                <div class="form-group">
-                    <label class="toggle-label">
-                        <input type="checkbox" @bind="currentApp.SlackAlert" />
-                        Enable Slack notifications for this app
-                    </label>
-                </div>
             </div>
         </div>
 
-        <!-- STEP 6: Confirm & Save -->
+        <!-- STEP 5: Confirm & Save -->
         <div class="form-section">
-            <div class="section-number">6</div>
+            <div class="section-number">5</div>
             <div class="section-content">
                 <h2>Review & Save</h2>
                 <p class="section-description">Review the configuration below and click save to apply changes.</p>
@@ -241,7 +227,6 @@ Monarch Admin Page
                             @if (currentApp.SelectedJiraWorkspaces.Any())
                             {
                                 @string.Join(", ", currentApp.SelectedJiraWorkspaces)
-                                @(currentApp.JiraAlert ? " (enabled)" : " (disabled)")
                             }
                             else
                             {
@@ -255,7 +240,6 @@ Monarch Admin Page
                             @if (currentApp.SelectedSlackChannels.Any())
                             {
                                 @string.Join(", ", currentApp.SelectedSlackChannels)
-                                @(currentApp.SlackAlert ? " (enabled)" : " (disabled)")
                             }
                             else
                             {
@@ -290,6 +274,7 @@ Monarch Admin Page
     // Form state
     private int selectedAppId = 0;
     private MonarchApp? currentApp;
+    private bool isNewApp = false;
     private bool showCreateForm = false;
     private string newAppName = "";
     private JiraWorkspaceOption newJiraWorkspace = new();
@@ -297,6 +282,11 @@ Monarch Admin Page
     // Save feedback
     private string saveStatus = "";
     private string saveStatusClass = "status-message";
+
+    // Test ticket feedback
+    private string testTicketStatus = "";
+    private string testTicketStatusClass = "status-message";
+    private bool testTicketSending = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -310,6 +300,9 @@ Monarch Admin Page
     {
         try
         {
+            // Sync discovered apps into monarch.apps so dashboard apps appear in the dropdown
+            await AppService.SyncDiscoveredAppsAsync();
+
             monarchApps = await AppService.GetAllAppsAsync();
             discoveredNewRelicApps = await AppService.GetDiscoveredNewRelicAppsAsync();
             discoveredNagiosApps = await AppService.GetDiscoveredNagiosAppsAsync();
@@ -328,6 +321,7 @@ Monarch Admin Page
     private async Task OnAppSelected()
     {
         saveStatus = "";
+        isNewApp = false;
         if (selectedAppId > 0)
         {
             currentApp = await AppService.GetAppByIdAsync(selectedAppId);
@@ -352,30 +346,32 @@ Monarch Admin Page
         newAppName = "";
     }
 
-    private async Task CreateNewApp()
+    private void CreateNewApp()
     {
         if (string.IsNullOrWhiteSpace(newAppName))
             return;
 
-        try
+        // Prepare a temporary MonarchApp object - don't save to DB yet
+        currentApp = new MonarchApp
         {
-            var newId = await AppService.CreateAppAsync(newAppName.Trim());
-            showCreateForm = false;
-            newAppName = "";
-
-            // Reload apps list and select the new one
-            await LoadAllData();
-            selectedAppId = newId;
-            currentApp = await AppService.GetAppByIdAsync(newId);
-
-            saveStatus = $"Application '{currentApp?.AppName}' created successfully.";
-            saveStatusClass = "status-message status-success";
-        }
-        catch (Exception ex)
-        {
-            saveStatus = $"Error creating application: {ex.Message}";
-            saveStatusClass = "status-message status-error";
-        }
+            AppId = 0, // Will be assigned after save
+            AppName = newAppName.Trim(),
+            Status = "Active",
+            NewRelicId = "",
+            NagiosId = "",
+            SlackAlert = false,
+            JiraAlert = false,
+            SmtpAlert = false,
+            SelectedSlackChannels = new List<string>(),
+            SelectedJiraWorkspaces = new List<string>()
+        };
+        
+        isNewApp = true;
+        showCreateForm = false;
+        selectedAppId = 0;
+        newAppName = "";
+        saveStatus = "Configure the new application and click 'Save Changes' at the bottom to create it.";
+        saveStatusClass = "status-message status-info";
     }
 
     // ===== Multi-Select Toggles =====
@@ -413,12 +409,14 @@ Monarch Admin Page
     private async Task AddJiraWorkspace()
     {
         if (string.IsNullOrWhiteSpace(newJiraWorkspace.WorkspaceKey) ||
-            string.IsNullOrWhiteSpace(newJiraWorkspace.WorkspaceName) ||
             string.IsNullOrWhiteSpace(newJiraWorkspace.BaseUrl))
             return;
 
         try
         {
+            // Use workspace key as the name
+            newJiraWorkspace.WorkspaceName = newJiraWorkspace.WorkspaceKey;
+            
             await AppService.AddJiraWorkspaceAsync(newJiraWorkspace);
             newJiraWorkspace = new JiraWorkspaceOption();
             jiraWorkspaces = await AppService.GetJiraWorkspacesAsync();
@@ -438,12 +436,50 @@ Monarch Admin Page
 
         try
         {
+            if (isNewApp)
+            {
+                // Create the app in database first
+                var newId = await AppService.CreateAppAsync(currentApp.AppName);
+                currentApp.AppId = newId;
+                isNewApp = false;
+            }
+
+            // Track which Slack channels are newly added
+            var previousChannels = new List<string>();
+            if (currentApp.AppId > 0)
+            {
+                var existingApp = await AppService.GetAppByIdAsync(currentApp.AppId);
+                if (existingApp != null)
+                {
+                    previousChannels = existingApp.SelectedSlackChannels;
+                }
+            }
+            var newlyAddedChannels = currentApp.SelectedSlackChannels
+                .Where(c => !previousChannels.Contains(c))
+                .ToList();
+
+            // Update with all mappings
             await AppService.UpdateAppAsync(currentApp);
+
+            // Send Slack notification to newly added channels
+            foreach (var channelKey in newlyAddedChannels)
+            {
+                var channel = slackChannels.FirstOrDefault(c => c.Key == channelKey);
+                if (channel != null)
+                {
+                    await SlackService.SendChannelNotificationAsync(
+                        channel.Key,
+                        $"{channel.ChannelName} has been added to the automated slack notifications from Monarch for {currentApp.AppName}."
+                    );
+                }
+            }
+
             saveStatus = $"Configuration for '{currentApp.AppName}' saved successfully. Changes will be reflected on the dashboard.";
             saveStatusClass = "status-message status-success";
 
             // Reload to reflect saved state
             await LoadAllData();
+            selectedAppId = currentApp.AppId;
         }
         catch (Exception ex)
         {
@@ -456,8 +492,44 @@ Monarch Admin Page
     {
         currentApp = null;
         selectedAppId = 0;
+        isNewApp = false;
         saveStatus = "";
         showCreateForm = false;
+        testTicketStatus = "";
+    }
+
+    // ===== Send Test Jira Ticket =====
+
+    private async Task SendTestTicket(string workspaceKey)
+    {
+        testTicketSending = true;
+        testTicketStatus = "Sending test ticket...";
+        testTicketStatusClass = "status-message status-info";
+
+        try
+        {
+            var result = await AppService.SendTestJiraTicketAsync(workspaceKey);
+            
+            if (result.success)
+            {
+                testTicketStatus = result.message;
+                testTicketStatusClass = "status-message status-success";
+            }
+            else
+            {
+                testTicketStatus = result.message;
+                testTicketStatusClass = "status-message status-error";
+            }
+        }
+        catch (Exception ex)
+        {
+            testTicketStatus = $"Error sending test ticket: {ex.Message}";
+            testTicketStatusClass = "status-message status-error";
+        }
+        finally
+        {
+            testTicketSending = false;
+        }
     }
 }
 
@@ -522,6 +594,66 @@ Monarch Admin Page
         margin: 0 0 4px 0;
         color: #FFFFFF;
         font-weight: 500;
+    }
+
+    .placeholder-badge {
+        font-size: 12px;
+        font-weight: 400;
+        color: #FFB347;
+        background-color: rgba(255, 179, 71, 0.15);
+        padding: 2px 8px;
+        border-radius: 4px;
+        margin-left: 8px;
+        vertical-align: middle;
+    }
+
+    /* ===== Auto-discovered Connection Display ===== */
+
+    .connection-display {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .connection-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        background-color: #3D3D3D;
+        border: 1px solid #4D4D4D;
+        border-radius: 6px;
+    }
+
+    .connection-label {
+        font-weight: 500;
+        color: #CCCCCC;
+        font-size: 14px;
+    }
+
+    .connection-value {
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .connection-value.connected {
+        color: #FFFFFF;
+    }
+
+    .connection-value.not-connected {
+        color: #888888;
+        font-style: italic;
+    }
+
+    .auto-badge {
+        font-size: 11px;
+        font-weight: 400;
+        color: #90EE90;
+        background-color: rgba(144, 238, 144, 0.12);
+        padding: 2px 8px;
+        border-radius: 4px;
     }
 
     .section-description {
@@ -637,10 +769,18 @@ Monarch Admin Page
         border-radius: 6px;
         cursor: pointer;
         transition: border-color 0.2s;
+        flex: 1;
     }
 
     .checkbox-item:hover {
         border-color: #0078D4;
+    }
+
+    .checkbox-item-with-button {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
     }
 
     .checkbox-item input[type="checkbox"] {
@@ -752,6 +892,27 @@ Monarch Admin Page
         background-color: #4D4D4D;
     }
 
+    .btn-test {
+        padding: 8px 16px;
+        background-color: #2D5A2D;
+        border: 1px solid #3D7A3D;
+        color: #90EE90;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: background-color 0.2s;
+        white-space: nowrap;
+    }
+
+    .btn-test:hover:not(:disabled) {
+        background-color: #3D7A3D;
+    }
+
+    .btn-test:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
     .save-actions {
         display: flex;
         gap: 12px;
@@ -787,5 +948,11 @@ Monarch Admin Page
         background-color: #5A2D2D;
         color: #EE9090;
         border: 1px solid #7A3D3D;
+    }
+
+    .status-info {
+        background-color: #2D4A5A;
+        color: #90C8EE;
+        border: 1px solid #3D6A7A;
     }
 </style>

@@ -135,15 +135,9 @@ public class JiraManager
 
                 Console.WriteLine($"Created incident {incidentId} for app {appName}");
 
-                // Create Jira ticket
+                // Create Jira ticket using template
                 var priority = status == "Down" ? "High" : "Medium";
-                var summary = $"{appName} - {status}";
-                var description = $"Application {appName} has changed status to {status}.\n\n" +
-                                $"Incident ID: {incidentId}\n" +
-                                $"Time: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC\n" +
-                                $"Status: {status}";
-
-                var ticket = await _connector.CreateIssue(summary, description, priority);
+                var ticket = await _connector.CreateIncidentIssue(appName, status, priority);
 
                 if (ticket != null)
                 {
@@ -170,7 +164,8 @@ public class JiraManager
             
             if (jiraKey != null)
             {
-                var comment = $"Status update: Application {appName} is now {newStatus} at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC";
+                // Use template for update comment (pass empty string as oldStatus since we don't track it here)
+                var comment = JiraIncidentTicket.CreateUpdateComment(appName, newStatus, "Previous");
                 await _connector.AddComment(jiraKey, comment);
                 
                 Console.WriteLine($"Updated Jira ticket {jiraKey} for incident {incidentId}");
@@ -213,12 +208,12 @@ public class JiraManager
 
                 Console.WriteLine($"Closed incident {incidentId} for app {appName}");
 
-                // Add comment to Jira ticket
+                // Add recovery comment to Jira ticket using template
                 var jiraKey = await GetJiraTicketForIncident(incidentId.Value);
                 
                 if (jiraKey != null)
                 {
-                    var comment = $"✅ RESOLVED: Application {appName} has recovered and is now Operational at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC";
+                    var comment = JiraIncidentTicket.CreateRecoveryComment(appName);
                     await _connector.AddComment(jiraKey, comment);
                     
                     Console.WriteLine($"Added recovery comment to Jira ticket {jiraKey}");

@@ -58,6 +58,8 @@ services:
     secrets:
       - monarch_sql_monarch_password
       - monarch_oidc_client_secret
+      - monarch_slack_webhooks
+      - monarch_jira_api_key
   monapi-worker:
     image: monapi-worker
     build:
