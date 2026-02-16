@@ -89,9 +89,20 @@
   
   protected override async Task OnInitializedAsync()
   {
+    List<string> usedIds = new();
+
     try
     {
-      newRelicOptions = await Service.GetAvailableNewRelicAppsAsync();
+      usedIds = await Service.GetUsedIdsAsync();
+    }
+    catch (Exception ex)
+    {
+      Console.WriteLine($"Error checking used IDs: {ex.Message}");
+    }
+    try
+    {
+      var allNr = await Service.GetAvailableNewRelicAppsAsync();
+      newRelicOptions = allNr.Where(opt => !usedIds.Contains(opt.AppId)).ToList();
     }
     catch (Exception ex)
     {
@@ -100,7 +111,8 @@
 
     try
     {
-      nagiosOptions = await Service.GetAvailableNagiosAppsAsync();
+      var allN = await Service.GetAvailableNagiosAppsAsync();
+      nagiosOptions = allN.Where(opt => !usedIds.Contains(opt.AppId)).ToList();
     }
     catch (Exception ex)
     {

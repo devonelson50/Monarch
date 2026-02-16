@@ -8,6 +8,57 @@ namespace Monarch.Services
     private readonly string _monapiConnectionString = monapiConn;
     private readonly string _monarchConnectionString = monarchConn;
 
+    public async Task<List<AppModel>> GetMonarchAppsAsync()
+      {
+          var apps = new List<AppModel>();
+
+          using (var conn = new SqlConnection(_monarchConnectionString))
+          {
+              await conn.OpenAsync();
+
+              var sql = @"
+                  SELECT 
+                      appId, 
+                      appName, 
+                      status, 
+                      newRelicId, 
+                      nagiosId, 
+                      mostRecentIncidentId, 
+                      slackAlert, 
+                      jiraAlert, 
+                      smtpAlert 
+                  FROM apps";
+
+              using (var cmd = new SqlCommand(sql, conn))
+              using (var reader = await cmd.ExecuteReaderAsync())
+              {
+                  while (await reader.ReadAsync())
+                  {
+                      string dbStatusString = reader.GetString(2);
+                      int dbStatusInt = Convert.ToInt32(dbStatusString);
+
+                      apps.Add(new AppModel
+                      {
+                          AppId = reader.GetInt32(0),
+                          AppName = reader.GetString(1),
+                          Status = (StatusType)dbStatusInt,
+
+                          // Handle Nullables safely
+                          NewRelicId = reader.IsDBNull(3) ? null : reader.GetString(3),
+                          NagiosId = reader.IsDBNull(4) ? null : reader.GetString(4),
+                          MostRecentIncidentId = reader.IsDBNull(5) ? null : reader.GetString(5),
+
+                          // Handle Booleans
+                          SlackAlert = reader.GetBoolean(6),
+                          JiraAlert = reader.GetBoolean(7),
+                          SmtpAlert = reader.GetBoolean(8)
+                      });
+                  }
+              }
+          }
+          return apps;
+      }
+    
     public async Task<List<NewRelicApp>> GetAvailableNewRelicAppsAsync()
     {
       var results = new List<NewRelicApp>();
@@ -60,6 +111,28 @@ namespace Monarch.Services
       return results;
     }
 
+    public async Task<List<string>> GetUsedIdsAsync()
+    {
+      var usedIds = new List<string>();
+      using (var conn = new SqlConnection(_monarchConnectionString))
+      {
+        await conn.OpenAsync();
+        var sql = "SELECT newRelicId FROM apps WHERE newRelicId IS NOT NULL " +
+                  "UNION " +
+                  "SELECT CAST(nagiosId AS VARCHAR) FROM apps WHERE nagiosId IS NOT NULL";
+
+        using (var cmd = new SqlCommand(sql, conn))
+        using (var reader = await cmd.ExecuteReaderAsync())
+        {
+          while (await reader.ReadAsync())
+          {
+            usedIds.Add(reader[0].ToString()!);
+          }
+        }
+      }
+      return usedIds;
+    }
+
     public async Task CreateMonarchAppAsync(AppModel app)
     {
       using (var conn = new SqlConnection(_monarchConnectionString))
@@ -83,16 +156,103 @@ namespace Monarch.Services
         using (var cmd = new SqlCommand(sql, conn))
         {
           cmd.Parameters.AddWithValue("@name", app.AppName);
-          cmd.Parameters.AddWithValue("@stat", "Unknown");
+          cmd.Parameters.AddWithValue("@stat", 0);
           
           cmd.Parameters.AddWithValue("@nrId",
-            app.NewRelicId.HasValue ? app.NewRelicId.Value : DBNull.Value);
+            String.IsNullOrEmpty(app.NewRelicId) ? DBNull.Value : app.NewRelicId);
           cmd.Parameters.AddWithValue("@nId",
-            app.NagiosId.HasValue ? app.NagiosId.Value : DBNull.Value);
+            String.IsNullOrEmpty(app.NagiosId) ? DBNull.Value : app.NagiosId);
 
           await cmd.ExecuteNonQueryAsync();
         }
       }
+    }
+    public async Task<AppDetails> GetDetailsAsync(AppModel app)
+    {
+        var details = new AppDetails();
+
+        using (var conn = new SqlConnection(_monapiConnectionString))
+        {
+          await conn.OpenAsync();
+
+          var sql = @"
+            SELECT 
+                -- New Relic Columns (Prefix with nr_)
+                nr.ipAddress as nr_ip,
+                nr.status as nr_status, 
+                nr.latency as nr_latency, 
+                nr.cpuUsage as nr_cpu, 
+                nr.throughput as nr_tput, 
+                nr.statusUpdateTime as nr_time,
+                nr.lastCheck as nr_check,
+                
+                -- Nagios Columns (Prefix with n_)
+                n.ipAddress as n_ip as n_ip
+                n.statusUpdateTime as n_time, 
+                n.output as n_output, 
+                n.perfData as n_perf, 
+                n.currentState as n_state,
+                n.lastCheck as n_check,
+                n.latency as n_latency,
+                n.lastStateChange as n_change,
+                n.lastTimeUp as n_up,
+                n.lastTimeDown as n_down,
+                n.lastTimeUnreachable as n_unreach,
+                n.lastNotification as n_notif
+            FROM 
+                (SELECT * FROM newRelicApps WHERE appId = @NrId) as nr
+            FULL OUTER JOIN 
+                (SELECT * FROM nagiosApps WHERE hostObjectId = @NId) as n
+            ON 1=1";
+            
+
+          using (var cmd = new SqlCommand(sql, conn))
+          {
+            cmd.Parameters.AddWithValue("@NrId", String.IsNullOrEmpty(app.NewRelicId) ? DBNull.Value : app.NewRelicId);
+            cmd.Parameters.AddWithValue("@NId", String.IsNullOrEmpty(app.NagiosId) ? DBNull.Value : app.NagiosId);
+          
+            using (var reader = await cmd.ExecuteReaderAsync())
+            {
+                if (await reader.ReadAsync())
+                {
+                    // --- 1. IP Address Fallback Logic ---
+                    string nrIp = !reader.IsDBNull(reader.GetOrdinal("nr_ip")) ? reader["nr_ip"].ToString() : null;
+                    string nIp = !reader.IsDBNull(reader.GetOrdinal("n_ip")) ? reader["n_ip"].ToString() : null;
+                    
+                    // Use NR if available, otherwise Nagios, otherwise default
+                    details.IpAddress = nrIp ?? nIp ?? "0.0.0.0";
+
+                    // --- 2. New Relic Mapping ---
+                    if (!string.IsNullOrEmpty(app.NewRelicId) && !reader.IsDBNull(reader.GetOrdinal("nr_status")))
+                    {
+                        details.nrStatus = Convert.ToInt32(reader["nr_status"]);
+                        details.nrLatency = Convert.ToInt32(reader["nr_latency"]);
+                        details.nrCpuUsage = Convert.ToSingle(reader["nr_cpu"]);
+                        details.nrThroughput = Convert.ToInt32(reader["nr_tput"]);
+                        details.nrStatusUpdateTime = Convert.ToDateTime(reader["nr_time"]);
+                        details.nrLastCheck = Convert.ToDateTime(reader["nr_check"]);
+                    }
+
+                    // --- 3. Nagios Mapping ---
+                    if (!string.IsNullOrEmpty(app.NagiosId) && !reader.IsDBNull(reader.GetOrdinal("n_state")))
+                    {
+                        details.statusUpdateTime = Convert.ToDateTime(reader["n_time"]);
+                        details.output = reader["n_output"].ToString() ?? "";
+                        details.perfData = reader["n_perf"].ToString() ?? "";
+                        details.currentState = Convert.ToInt32(reader["n_state"]);
+                        details.lastCheck = Convert.ToDateTime(reader["n_check"]);
+                        details.lastStateChange = Convert.ToDateTime(reader["n_change"]);
+                        details.lastTimeUp = Convert.ToDateTime(reader["n_up"]);
+                        details.lastTimeDown = Convert.ToDateTime(reader["n_down"]);
+                        details.lastTimeUnreachable = Convert.ToDateTime(reader["n_unreach"]);
+                        details.lastNotification = Convert.ToDateTime(reader["n_notif"]);
+                        details.latency = reader["n_latency"].ToString() ?? "";
+                    }
+                }
+            }
+          }
+        }
+        return details;
     }
   }
 }

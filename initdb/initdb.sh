@@ -59,6 +59,8 @@ else
     exit 5
 fi
 
+export MSSQL_SA_PASSWORD="$SA_PASSWORD"
+
 #export ODBC_TLS_VER=TLSv1.2
 /opt/mssql/bin/sqlservr &
 SQL_PID=$!
@@ -71,22 +73,25 @@ echo "SQL Server is starting."
 DBSTATUS=1
 i=0
 
-while [[ $DBSTATUS -ne 0 ]] && [[ $i -lt 60 ]]; do
-	i=$(($i+1))
-	DBSTATUS=$(/opt/mssql-tools18/bin/sqlcmd -N -h -1 -t 1 -U SA -P "$SA_PASSWORD" -Q "SET NOCOUNT ON; Select SUM(state) from sys.databases")
-	sleep 1
-    echo "SQL Server is starting..."
+until /opt/mssql-tools18/bin/sqlcmd \
+    -S localhost \
+    -U SA \
+    -P "$SA_PASSWORD" \
+    -Q "SELECT 1" \
+    -N -C >/dev/null 2>&1
+do
+    i=$((i+1))
+    if [ $i -ge 60 ]; then
+        echo "SQL Server did not become ready in time."
+        exit 1
+    fi
+    echo "Waiting for SQL Server..."
+    sleep 1
 done
 
-if [[ $DBSTATUS -ne 0 ]]; then
-	echo "SQL Server took more than 60 seconds to start up or one or more databases are not in an ONLINE state."
-    echo $DBSTATUS 
-	exit 1
-fi
-
 echo "SQL Server is started. Running setup.sql."
-/opt/mssql-tools18/bin/sqlcmd -N \
-    -S sqlserver \
+/opt/mssql-tools18/bin/sqlcmd -N -C \
+    -S localhost \
     -U SA \
     -P "$SA_PASSWORD" \
     -d master \

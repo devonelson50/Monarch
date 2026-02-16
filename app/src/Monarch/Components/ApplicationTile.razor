@@ -6,10 +6,12 @@ Monarch Application Tile Component
 *@
 
 @using Monarch.Models
+@using Monarch.Services
+@inject AppCreationService Service
 
 <div class="app-tile @GetStatusClass() @(IsExpanded ? "expanded" : string.Empty)">
     <div class="tile-header">
-        <span class="app-name">@Application.ResourceName</span>
+        <span class="app-name">@App.AppName</span>
         <div class="status-indicator">
             <span class="status-dot"></span>
             <button class="expand-btn" title="Expand" aria-label="Expand" aria-expanded="@IsExpanded"
@@ -25,67 +27,128 @@ Monarch Application Tile Component
     @if (IsExpanded)
     {
         <div class="details">
-            <div class="metrics">
-                <div class="metric">
-                    <span class="label">Uptime</span>
-                    <span class="value">99.9%</span>
-                    <div class="bar">
-                        <div class="fill" style="width: 99.9%"></div>
+            @if (isLoadingDetails)
+            {
+                <div class="loading-state">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Loading live metrics...
+                </div>
+            }
+            else if (details != null)
+            {
+                <div class="metrics">
+                    
+                    <div class="metric">
+                        <span class="label">Latency</span>
+                        <span class="value">
+                            @(details.nrLatency > 0 ? $"{details.nrLatency} ms" : details.latency)
+                        </span>
+                        
+                        <div class="bar">
+                            @{
+                                var latencyPct = Math.Min(details.nrLatency / 10, 100); 
+                                var colorClass = details.nrLatency > 500 ? "red" : (details.nrLatency > 200 ? "yellow" : "green");
+                            }
+                            <div class="fill @colorClass" style="width: @latencyPct%"></div>
+                        </div>
+                    </div>
+
+                    <div class="metric">
+                        <span class="label">CPU Usage</span>
+                        <span class="value">@details.nrCpuUsage.ToString("0.0")%</span>
+                        <div class="bar">
+                            <div class="fill @(details.nrCpuUsage > 80 ? "red" : "blue")" 
+                                 style="width: @Math.Min(details.nrCpuUsage, 100)%"></div>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(details.output))
+                    {
+                        <div class="metric-row">
+                            <span class="label">Nagios Output</span>
+                            <span class="value small text-truncate" title="@details.output">
+                                @details.output
+                            </span>
+                        </div>
+                    }
+
+                    <div class="metric-row mt-2">
+                        <span class="label">Last Checked</span>
+                        <span class="muted">
+                            @GetTimeAgo(details.nrLastCheck > details.lastCheck ? details.nrLastCheck : details.lastCheck)
+                        </span>
                     </div>
                 </div>
-                <div class="metric">
-                    <span class="label">Response</span>
-                    <span class="value">120 ms</span>
-                    <div class="bar">
-                        <div class="fill yellow" style="width: 60%"></div>
-                    </div>
-                </div>
-                <div class="metric">
-                    <span class="label">Error Rate</span>
-                    <span class="value">0.7%</span>
-                    <div class="bar">
-                        <div class="fill red" style="width: 7%"></div>
-                    </div>
-                </div>
-                <div class="metric-row">
-                    <span class="label">Last Checked</span>
-                    <span class="muted">@DateTime.Now.ToString("g")</span>
-                </div>
-                <div class="metric-row">
-                    <span class="label">Incidents (30d)</span>
-                    <span class="muted">2</span>
-                </div>
-            </div>
+            }
+            else
+            {
+                <p class="text-muted p-3">No live data available.</p>
+            }
         </div>
     }
 </div>
 
-@code {
+@code 
+{
     [Parameter]
-    public ApplicationStatus Application { get; set; } = default!;
+    public AppModel App { get; set; } = default!;
 
     [Parameter]
-    public EventCallback<ApplicationStatus> OnExpand { get; set; }
+    public EventCallback<AppModel> OnExpand { get; set; }
 
     private bool IsExpanded { get; set; }
+
+    // New fields for data fetching
+    private bool isLoadingDetails = false;
+    private AppDetails? details;
 
     private async Task ExpandAsync()
     {
         IsExpanded = !IsExpanded;
+
+        // NEW: Lazy Load Logic
+        if (IsExpanded && details == null)
+        {
+            isLoadingDetails = true;
+            try
+            {
+                details = await Service.GetDetailsAsync(App);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading details: {ex.Message}");
+            }
+            finally
+            {
+                isLoadingDetails = false;
+            }
+        }
+
         if (OnExpand.HasDelegate)
         {
-            await OnExpand.InvokeAsync(Application);
+            await OnExpand.InvokeAsync(App);
         }
     }
 
-    private string GetStatusClass() => Application.Status switch
+    private string GetStatusClass() => App.Status switch
     {
         StatusType.Operational => "status-operational",
         StatusType.DegradedPerformance => "status-degraded",
         StatusType.Outage => "status-outage",
         _ => "status-unknown"
     };
+
+    private string GetTimeAgo(DateTime dt)
+    {
+        if (dt <= DateTime.MinValue) return "Never";
+        var span = DateTime.Now - dt;
+        if (span.TotalMinutes < 1) return "Just now";
+        if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes}m ago";
+        if (span.TotalHours < 24) return $"{(int)span.TotalHours}h ago";
+        return dt.ToString("MMM dd");
+    }
 }
+
 
 <style>
     .app-tile {

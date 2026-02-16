@@ -8,8 +8,10 @@ Monarch Dashboard Page
 
 @page "/"
 @using Monarch.Models
+@using Monarch.Services
 @using Microsoft.Data.SqlClient
 @rendermode InteractiveServer
+@inject AppCreationService Service
 
 <PageTitle>Monarch</PageTitle>
 
@@ -38,11 +40,11 @@ Monarch Dashboard Page
         <div class="applications-grid">
             @foreach (var app in applications)
             {
-                <div class="@($"app-item {(draggingId == app.Id ? "dragging" : string.Empty)} {(dragOverId == app.Id ? "drag-over" : string.Empty)}")"
-                    draggable="true" @ondragstart="@(() => OnDragStart(app.Id))" @ondragover:preventDefault="true"
-                    @ondragover="@(() => OnDragOver(app.Id))" @ondrop="@(() => OnDrop(app.Id))" @ondragend="OnDragEnd"
-                    @key="app.Id">
-                    <ApplicationTile Application="app" />
+                <div class="@($"app-item {(draggingId == app.AppId ? "dragging" : string.Empty)} {(dragOverId == app.AppId ? "drag-over" : string.Empty)}")"
+                    draggable="true" @ondragstart="@(() => OnDragStart(app.AppId))" @ondragover:preventDefault="true"
+                    @ondragover="@(() => OnDragOver(app.AppId))" @ondrop="@(() => OnDrop(app.AppId))" @ondragend="OnDragEnd"
+                    @key="app.AppId">
+                    <ApplicationTile App="app" />
                 </div>
             }
         </div>
@@ -50,11 +52,11 @@ Monarch Dashboard Page
 </div>
 
 @code {
-    private List<ApplicationStatus> applications = new();
-    private List<ApplicationStatus> allApplications = new();
+    private List<AppModel> applications = new();
+    private List<AppModel> allApplications = new();
     private string selectedSort = "status";
-    private string? draggingId;
-    private string? dragOverId;
+    private int? draggingId;
+    private int? dragOverId;
     private bool isLoading = true;
     private System.Threading.Timer? refreshTimer;
 
@@ -74,38 +76,7 @@ Monarch Dashboard Page
     {
         try
         {
-            var password = System.IO.File.ReadAllText("/run/secrets/monarch_sql_monarch_password");
-            var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monarch;Password={password};Encrypt=True;TrustServerCertificate=False;";
-            
-            var apps = new List<ApplicationStatus>();
-
-            using (var connection = new SqlConnection(connectionString))
-            {
-                await connection.OpenAsync();
-                var cmd = new SqlCommand("SELECT appId, appName, status FROM newRelicApps ORDER BY appName", connection);
-
-                using (var reader = await cmd.ExecuteReaderAsync())
-                {
-                    while (await reader.ReadAsync())
-                    {
-                        var statusString = reader.GetInt32(2);
-                        var statusType = statusString switch
-                        {
-                            0 => StatusType.Operational,
-                            1 => StatusType.DegradedPerformance,
-                            2 => StatusType.Outage,
-                            _ => StatusType.Unknown
-                        };
-
-                        apps.Add(new ApplicationStatus
-                        {
-                            Id = reader.GetInt32(0).ToString(),
-                            Name = reader.GetString(1),
-                            Status = statusType
-                        });
-                    }
-                }
-            }
+            var apps = await Service.GetMonarchAppsAsync();
 
             allApplications = apps;
             ApplySort();
@@ -114,16 +85,10 @@ Monarch Dashboard Page
         catch (Exception ex)
         {
             Console.WriteLine($"Error loading applications: {ex.Message}");
-            // Fallback to empty list
-            allApplications = new List<ApplicationStatus>();
-            applications = new List<ApplicationStatus>();
+            allApplications = new List<AppModel>();
+            applications = new List<AppModel>();
             isLoading = false;
         }
-    }
-
-    protected override void OnInitialized()
-    {
-        // Removed - now using OnInitializedAsync with database
     }
 
     private void OnSortChanged(ChangeEventArgs e)
@@ -136,7 +101,7 @@ Monarch Dashboard Page
     {
         applications = selectedSort switch
         {
-            "alpha" => allApplications.OrderBy(a => a.Name).ToList(),
+            "alpha" => allApplications.OrderBy(a => a.AppName).ToList(),
             "status" => allApplications
             .OrderBy(a => a.Status switch
             {
@@ -145,25 +110,25 @@ Monarch Dashboard Page
                 StatusType.Operational => 2,
                 _ => 3
             })
-            .ThenBy(a => a.Name)
+            .ThenBy(a => a.AppName)
             .ToList(),
             _ => allApplications.ToList()
         };
     }
 
     // Drag & drop
-    private void OnDragStart(string id)
+    private void OnDragStart(int id)
     {
         draggingId = id;
     }
 
-    private void OnDragOver(string overId)
+    private void OnDragOver(int overId)
     {
         dragOverId = overId;
         StateHasChanged();
     }
 
-    private void OnDrop(string dropTargetId)
+    private void OnDrop(int dropTargetId)
     {
         if (draggingId is null || draggingId == dropTargetId)
         {
@@ -171,8 +136,8 @@ Monarch Dashboard Page
             return;
         }
 
-        var fromIndex = applications.FindIndex(a => a.Id == draggingId);
-        var toIndex = applications.FindIndex(a => a.Id == dropTargetId);
+        var fromIndex = applications.FindIndex(a => a.AppId == draggingId);
+        var toIndex = applications.FindIndex(a => a.AppId == dropTargetId);
         if (fromIndex < 0 || toIndex < 0)
         {
             ClearDragState();
