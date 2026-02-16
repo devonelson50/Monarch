@@ -36,48 +36,77 @@ Monarch Application Tile Component
             }
             else if (details != null)
             {
-                <div class="metrics">
+                <div class="common-row">
+                    <div class="info-pill">
+                        <span class="label">IP:</span>
+                        <span class="value">@details.IpAddress</span>
+                    </div>
+                </div>
+
+                <div class="platform-grid">
                     
-                    <div class="metric">
-                        <span class="label">Latency</span>
-                        <span class="value">
-                            @(details.nrLatency > 0 ? $"{details.nrLatency} ms" : details.latency)
-                        </span>
-                        
-                        <div class="bar">
-                            @{
-                                var latencyPct = Math.Min(details.nrLatency / 10, 100); 
-                                var colorClass = details.nrLatency > 500 ? "red" : (details.nrLatency > 200 ? "yellow" : "green");
-                            }
-                            <div class="fill @colorClass" style="width: @latencyPct%"></div>
-                        </div>
-                    </div>
-
-                    <div class="metric">
-                        <span class="label">CPU Usage</span>
-                        <span class="value">@details.nrCpuUsage.ToString("0.0")%</span>
-                        <div class="bar">
-                            <div class="fill @(details.nrCpuUsage > 80 ? "red" : "blue")" 
-                                 style="width: @Math.Min(details.nrCpuUsage, 100)%"></div>
-                        </div>
-                    </div>
-
-                    @if (!string.IsNullOrEmpty(details.output))
+                    @if (!string.IsNullOrEmpty(App.NewRelicId))
                     {
-                        <div class="metric-row">
-                            <span class="label">Nagios Output</span>
-                            <span class="value small text-truncate" title="@details.output">
-                                @details.output
-                            </span>
+                        <div class="platform-card new-relic">
+                            <div class="card-header">
+                                <span class="platform-icon">NR</span> New Relic
+                                <span class="last-check">Checked @GetTimeAgo(details.nrLastCheck)</span>
+                            </div>
+                            
+                            <div class="metric-grid">
+                                <div class="metric-item">
+                                    <span class="label">CPU Usage</span>
+                                    <span class="value">@details.nrCpuUsage.ToString("0.0")%</span>
+                                    <div class="bar-bg"><div class="bar-fill" style="width: @Math.Min(details.nrCpuUsage, 100)%"></div></div>
+                                </div>
+
+                                <div class="metric-item">
+                                    <span class="label">Latency</span>
+                                    <span class="value">@details.nrLatency ms</span>
+                                    <div class="bar-bg"><div class="bar-fill latency" style="width: @(Math.Min(details.nrLatency / 2, 100))%"></div></div>
+                                </div>
+
+                                <div class="metric-item">
+                                    <span class="label">Throughput</span>
+                                    <span class="value">@details.nrThroughput rpm</span>
+                                </div>
+                            </div>
                         </div>
                     }
 
-                    <div class="metric-row mt-2">
-                        <span class="label">Last Checked</span>
-                        <span class="muted">
-                            @GetTimeAgo(details.nrLastCheck > details.lastCheck ? details.nrLastCheck : details.lastCheck)
-                        </span>
-                    </div>
+                    @if (!string.IsNullOrEmpty(App.NagiosId))
+                    {
+                        <div class="platform-card nagios">
+                            <div class="card-header">
+                                <span class="platform-icon">N</span> Nagios
+                                <span class="last-check">Changed @GetTimeAgo(details.lastStateChange)</span>
+                            </div>
+
+                            <div class="metric-list">
+                                <div class="metric-row">
+                                    <span class="label">Status:</span>
+                                    <span class="value badge @GetNagiosStateClass(details.currentState)">
+                                        @GetNagiosStateLabel(details.currentState)
+                                    </span>
+                                </div>
+                                
+                                <div class="metric-row">
+                                    <span class="label">Output:</span>
+                                    <span class="value text-wrap">@details.output</span>
+                                </div>
+
+                                <div class="metric-row">
+                                    <span class="label">Perf Data:</span>
+                                    <span class="value code">@details.perfData</span>
+                                </div>
+                                
+                                <div class="metric-row">
+                                    <span class="label">Latency:</span>
+                                    <span class="value">@details.latency</span>
+                                </div>
+                            </div>
+                        </div>
+                    }
                 </div>
             }
             else
@@ -136,6 +165,16 @@ Monarch Application Tile Component
         StatusType.DegradedPerformance => "status-degraded",
         StatusType.Outage => "status-outage",
         _ => "status-unknown"
+    };
+
+private string GetNagiosStateLabel(int state) => state switch
+    {
+        0 => "OK", 1 => "WARNING", 2 => "CRITICAL", 3 => "UNKNOWN", _ => "N/A"
+    };
+
+    private string GetNagiosStateClass(int state) => state switch
+    {
+        0 => "bg-success", 1 => "bg-warning", 2 => "bg-danger", _ => "bg-secondary"
     };
 
     private string GetTimeAgo(DateTime dt)

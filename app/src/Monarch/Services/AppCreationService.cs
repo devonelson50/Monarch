@@ -76,7 +76,7 @@ namespace Monarch.Services
           {
             results.Add(new NewRelicApp
             {
-              AppId = reader.GetInt32(0),
+              AppId = reader.GetString(0),
               AppName = reader.GetString(1)
             });
           }
@@ -102,7 +102,7 @@ namespace Monarch.Services
           {
             results.Add(new NagiosApp
             {
-              AppId = reader.GetInt32(0),
+              AppId = reader.GetString(0),
               AppName = reader.GetString(1)
             });
           }
@@ -187,7 +187,7 @@ namespace Monarch.Services
                 nr.lastCheck as nr_check,
                 
                 -- Nagios Columns (Prefix with n_)
-                n.ipAddress as n_ip as n_ip
+                n.ipAddress as n_ip,
                 n.statusUpdateTime as n_time, 
                 n.output as n_output, 
                 n.perfData as n_perf, 
