@@ -26,8 +26,8 @@ namespace Monarch.Services
         {
             _httpClient = httpClient;
             var password = File.ReadAllText("/run/secrets/monarch_sql_monarch_password").Trim();
-            _monarchConnectionString = $"Server=sqlserver,1433;Database=monarch;User Id=monarch;Password={password};TrustServerCertificate=True;";
-            _monapiConnectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monarch;Password={password};TrustServerCertificate=True;";
+            _monarchConnectionString = $"Server=sqlserver,1433;Database=monarch;User Id=monarch;Password={password};TrustServerCertificate=False;";
+            _monapiConnectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monarch;Password={password};TrustServerCertificate=False;";
         }
 
         // ===== Monarch App CRUD =====
