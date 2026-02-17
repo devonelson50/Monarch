@@ -94,8 +94,6 @@ services:
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD_FILE: /run/secrets/monarch_sql_sa_password
-    ports:
-      - 1433:1433
     volumes:
       - sqlserverdata:/var/opt/mssql
       - sql_certificate:/certificate
@@ -171,6 +169,7 @@ services:
       - monarch_certificate:/certificates/monarch
       - keycloak_certificate:/certificates/keycloak
       - monapi_certificate:/certificates/monapi
+      - ./monarch_root_ca.crt:/usr/local/bin/monarch_root_ca.crt
     secrets:
       - mon-ca_key
     user: root

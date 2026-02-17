@@ -74,4 +74,11 @@ chown 1654 /certificates/monarch/client_bundle.crt
 cp /certificates/sql/client_bundle.crt /certificates/monapi/client_bundle.crt
 chown 1654 /certificates/monapi/client_bundle.crt
 
+CURRENT_FINGERPRINT=$(step certificate fingerprint /home/step/certs/root_ca.crt)
+EXPORTED_FINGERPRINT=$(step certificate fingerprint /usr/local/bin/monarch_root_ca.crt)
+if [ "$CURRENT_FINGERPRINT" != "$EXPORTED_FINGERPRINT" ]; then
+    echo "Exporting root certificate to host"
+    cat /home/step/certs/root_ca.crt > /usr/local/bin/monarch_root_ca.crt
+fi
+
 echo "Certificate generation completed. Exiting."
