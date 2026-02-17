@@ -1,12 +1,5 @@
 namespace Monarch.Models
 {
-    public enum StatusType
-    {
-        Unknown,
-        Operational,
-        DegradedPerformance,
-        Outage
-    }
 
     public class ResourceStatus
     {

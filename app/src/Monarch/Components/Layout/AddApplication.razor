@@ -1,0 +1,148 @@
+@using Microsoft.AspNetCore.Mvc.ApplicationModels
+@using Monarch.Models
+@using Monarch.Services
+@inject AppCreationService Service
+
+@namespace Monarch.Layout
+
+@if (IsVisible){
+  <div class="admin-overlay" @onclick="Close">
+    <div class="admin-card card shadow" @onclick:stopPropagation>
+      <div class="card-header d-flex justify-content-between">
+        <h5 class="mb-0">Add New Application</h5>
+        <button class="btn-close btn-close-white" @onclick="Close"></button>
+      </div>
+      <div class="card-body">
+        <EditForm Model="appModel" OnValidSubmit="HandleSubmit">
+          <DataAnnotationsValidator />
+          <ValidationSummary class="text-danger small" />
+
+          <div class="mb-3">
+            <label class="form-label">Application Name</label>
+            <InputText @bind-Value="appModel.AppName" class="form-control bg-dark text-white" />
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">New Relic Connection</label>
+            <InputSelect @bind-Value="appModel.NewRelicId" class="form-select custom-dropdown">
+              <option value="">-- No Connection --</option>
+              @if (newRelicOptions != null)
+              {
+                @foreach (var nrApp in newRelicOptions)
+                {
+                  <option value="@nrApp.AppId">@nrApp.AppName</option>
+                }
+              }
+            </InputSelect>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Nagios Connection</label>
+            <InputSelect @bind-Value="appModel.NagiosId" class="form-select custom-dropdown">
+              <option value="">-- No Connection --</option>
+              @if (nagiosOptions != null)
+              {
+                @foreach (var nApp in nagiosOptions)
+                {
+                  <option value="@nApp.AppId">@nApp.AppName</option>
+                }
+              }
+            </InputSelect>
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 mt-4">
+            <button type="button" class="btn btn-outline-secondary" @onclick="Close">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Application</button>
+          </div>
+        </EditForm>
+      </div>
+    </div>
+  </div>
+}
+
+<style>
+  .custom-dropdown 
+  {
+    background-color: #2D2D2D;
+    color: white;
+    border: 1px solid #6c757d;
+  }
+  .custom-dropdown:focus 
+  {
+    background-color: #3D3D3D;
+    color: white;
+    border-color: #0d6efd;
+  }
+</style>
+
+@code
+{
+  [Parameter] public bool IsVisible { get; set; }
+  [Parameter] public EventCallback OnClose { get; set; }
+
+  [Parameter] public EventCallback OnApplicationAdded { get; set; }
+
+  private AppModel appModel = new();
+
+  private List<NewRelicApp> newRelicOptions = new();
+  private List<NagiosApp> nagiosOptions = new();
+  
+  protected override async Task OnInitializedAsync()
+  {
+    List<string> usedIds = new();
+
+    try
+    {
+      usedIds = await Service.GetUsedIdsAsync();
+    }
+    catch (Exception ex)
+    {
+      Console.WriteLine($"Error checking used IDs: {ex.Message}");
+    }
+    try
+    {
+      var allNr = await Service.GetAvailableNewRelicAppsAsync();
+      newRelicOptions = allNr.Where(opt => !usedIds.Contains(opt.AppId)).ToList();
+    }
+    catch (Exception ex)
+    {
+      Console.WriteLine($"Error loading New Relic apps: {ex.Message}");
+    }
+
+    try
+    {
+      var allN = await Service.GetAvailableNagiosAppsAsync();
+      nagiosOptions = allN.Where(opt => !usedIds.Contains(opt.AppId)).ToList();
+    }
+    catch (Exception ex)
+    {
+      Console.WriteLine($"Error loading Nagios apps: {ex.Message}");
+    }
+  }
+
+  private async Task Close()
+  {
+    await OnClose.InvokeAsync();
+  }
+
+  private async Task HandleSubmit()
+  {
+    try
+    {
+      await Service.CreateMonarchAppAsync(appModel);
+
+      appModel = new();
+
+      if(OnApplicationAdded.HasDelegate)
+      {
+        await OnApplicationAdded.InvokeAsync();
+      }
+
+      await Close();
+    }
+    catch (Exception ex)
+    {
+      Console.WriteLine($"Error saving app: {ex.Message}");
+    }
+  }
+}
