@@ -58,6 +58,8 @@ services:
     secrets:
       - monarch_sql_monarch_password
       - monarch_oidc_client_secret
+      - monarch_slack_webhooks
+      - monarch_jira_api_key
   monapi-worker:
     image: monapi-worker
     build:
@@ -77,8 +79,12 @@ services:
       - monarch_jira_api_key
       - newrelic_account_number
       - monarch_simulator_api_key
+      - monarch_kafka_password
     environment:
       nagios_uri: https://nxi.455garage.com/nagiosxi/ # 1:1 match with external URL in General Program Settings
+      kafka_server:
+      kafka_port:
+      kafka_user:
       SSL_CERT_FILE: /certificate/client_bundle.crt
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
@@ -88,8 +94,6 @@ services:
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD_FILE: /run/secrets/monarch_sql_sa_password
-    ports:
-      - 1433:1433
     volumes:
       - sqlserverdata:/var/opt/mssql
       - sql_certificate:/certificate
@@ -165,6 +169,7 @@ services:
       - monarch_certificate:/certificates/monarch
       - keycloak_certificate:/certificates/keycloak
       - monapi_certificate:/certificates/monapi
+      - ./monarch_root_ca.crt:/usr/local/bin/monarch_root_ca.crt
     secrets:
       - mon-ca_key
     user: root
@@ -215,3 +220,6 @@ secrets:
   mon-ca_key:
     # external: true
     file: ./.credentials/mon-ca_key.txt # development only
+  monarch_kafka_password:
+    # external: true
+    file: ./.credentials/monarch_kafka_password.txt

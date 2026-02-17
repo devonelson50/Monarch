@@ -26,9 +26,9 @@ public class JiraConnector
         _authHeader = $"Basic {base64Credentials}";
     }
 
-    // Creates a new Jira issue for an incident
+    // Creates a new Jira incident issue for an application based on template
 
-    public async Task<JiraTicket?> CreateIssue(string summary, string description, string priority = "Medium")
+    public async Task<JiraTicket?> CreateIncidentIssue(string appName, string status, string priority = "Medium")
     {
         try
         {
@@ -41,37 +41,8 @@ public class JiraConnector
             request.AddHeader("Content-Type", "application/json");
             request.AddHeader("Accept", "application/json");
 
-            // Build the Jira issue payload
-            var payload = new
-            {
-                fields = new
-                {
-                    project = new { key = _projectKey },
-                    summary = summary,
-                    description = new
-                    {
-                        type = "doc",
-                        version = 1,
-                        content = new[]
-                        {
-                            new
-                            {
-                                type = "paragraph",
-                                content = new[]
-                                {
-                                    new
-                                    {
-                                        type = "text",
-                                        text = description
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    issuetype = new { name = _issueType },
-                    priority = new { name = priority }
-                }
-            };
+            // Build the Jira issue payload using template
+            var payload = JiraIncidentTicket.Create(_projectKey, appName, status, priority);
 
             request.AddJsonBody(payload);
             var response = await client.PostAsync(request);
@@ -94,11 +65,18 @@ public class JiraConnector
 
             Console.WriteLine($"Successfully created Jira issue: {issueKey}");
 
+            var statusIcon = status switch
+            {
+                "Down" => "🔴",
+                "Degraded" => "🟡",
+                _ => "⚪"
+            };
+
             return new JiraTicket
             {
                 IssueKey = issueKey,
-                Summary = summary,
-                Description = description,
+                Summary = $"{statusIcon} {appName} - Status: {status}",
+                Description = $"Application {appName} status is {status}",
                 Status = "Open",
                 Priority = priority,
                 CreatedAt = DateTime.UtcNow

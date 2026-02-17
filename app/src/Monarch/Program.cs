@@ -46,14 +46,22 @@ builder.Services.AddScoped<AppCreationService>(sp =>
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Register HttpClient for services that need it
+HttpClient httpClient = new HttpClient();
+builder.Services.AddSingleton(httpClient);
+
+// Register Slack Admin Service for admin panel
+builder.Services.AddSingleton<Monarch.Services.SlackAdminService>();
+
+// Register App Admin Service for application configuration management
+builder.Services.AddSingleton<Monarch.Services.AppAdminService>();
+
 // enable forwarding to support traefik reverse proxy
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
 });
 
-HttpClient httpClient = new HttpClient();
-builder.Services.AddSingleton(httpClient);
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;

@@ -179,6 +179,7 @@ GO
 
 -- Nagios Incidents TBD
 
+
 IF OBJECT_ID('jira', 'U') IS NULL
 BEGIN
     CREATE TABLE jira (
@@ -277,6 +278,36 @@ BEGIN
     CREATE TABLE appTeams (
         teamId INT NOT NULL,
         appId INT NOT NULL
+    );
+END
+GO
+
+IF OBJECT_ID('jiraWorkspaces', 'U') IS NULL
+BEGIN
+    CREATE TABLE jiraWorkspaces (
+        workspaceKey VARCHAR(100) PRIMARY KEY,
+        workspaceName VARCHAR(255) NOT NULL,
+        baseUrl VARCHAR(255) NOT NULL
+    );
+END
+GO
+
+IF OBJECT_ID('appSlackChannels', 'U') IS NULL
+BEGIN
+    CREATE TABLE appSlackChannels (
+        appId INT NOT NULL,
+        channelKey VARCHAR(100) NOT NULL,
+        PRIMARY KEY (appId, channelKey)
+    );
+END
+GO
+
+IF OBJECT_ID('appJiraWorkspaces', 'U') IS NULL
+BEGIN
+    CREATE TABLE appJiraWorkspaces (
+        appId INT NOT NULL,
+        workspaceKey VARCHAR(100) NOT NULL,
+        PRIMARY KEY (appId, workspaceKey)
     );
 END
 GO
