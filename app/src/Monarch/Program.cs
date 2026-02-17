@@ -36,8 +36,8 @@ if (string.IsNullOrEmpty(authority) || string.IsNullOrEmpty(publicAuthority) || 
 StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
 
 var monarchKey = File.ReadAllText("/run/secrets/monarch_sql_monarch_password").Trim();
-var monapiConnectionString = $"Server=sqlserver;Database=monapi;User Id=monarch;Password={monarchKey};TrustServerCertificate=True;";
-var monarchConnectionString = $"Server=sqlserver;Database=monarch;User Id=monarch;Password={monarchKey};TrustServerCertificate=True;";
+var monapiConnectionString = $"Server=sqlserver;Database=monapi;User Id=monarch;Password={monarchKey};TrustServerCertificate=False;";
+var monarchConnectionString = $"Server=sqlserver;Database=monarch;User Id=monarch;Password={monarchKey};TrustServerCertificate=False;";
 
 // Add services to the container.
 builder.Services.AddScoped<AppCreationService>(sp =>

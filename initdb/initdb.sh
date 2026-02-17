@@ -74,11 +74,11 @@ DBSTATUS=1
 i=0
 
 until /opt/mssql-tools18/bin/sqlcmd \
-    -S localhost \
+    -S sqlserver \
     -U SA \
     -P "$SA_PASSWORD" \
     -Q "SELECT 1" \
-    -N -C >/dev/null 2>&1
+    -N >/dev/null 2>&1
 do
     i=$((i+1))
     if [ $i -ge 60 ]; then
@@ -90,8 +90,8 @@ do
 done
 
 echo "SQL Server is started. Running setup.sql."
-/opt/mssql-tools18/bin/sqlcmd -N -C \
-    -S localhost \
+/opt/mssql-tools18/bin/sqlcmd -N \
+    -S sqlserver \
     -U SA \
     -P "$SA_PASSWORD" \
     -d master \
