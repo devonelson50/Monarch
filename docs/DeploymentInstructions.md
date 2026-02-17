@@ -16,7 +16,7 @@
       - [Jira API Key](#jira-api-key)
       - [OIDC Client Secret](#oidc-client-secret)
       - [Slack Webhooks](#slack-webhooks)
-      - [SMTP Connection](#smtp-connection)
+      - [Kafka Connection](#kafka-connection)
       - [SQL Credentials](#sql-credentials)
     - [OIDC Client Configuration](#oidc-client-configuration)
       - [Generate a Unique Client Secret](#generate-a-unique-client-secret)
@@ -63,7 +63,7 @@ If the variable is not set, or the formatting is not correct, the integration wi
 #### Jira API Key
 #### OIDC Client Secret
 #### Slack Webhooks
-#### SMTP Connection
+#### Kafka Connection
 #### SQL Credentials
 ### OIDC Client Configuration
 > This section covers the necessary steps to configure OIDC communication between the Monarch and Keycloak containers.
