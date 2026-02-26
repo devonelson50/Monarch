@@ -131,14 +131,16 @@ public class Worker : BackgroundService
             using (var connection = new SqlConnection(connectionString))
             {
                 await connection.OpenAsync();
-                var query = "SELECT appId, appName, status FROM newRelicApps";
+                var query = @"SELECT 'NR_' + CAST(appId AS VARCHAR(50)) AS appId, appName, status FROM newRelicApps
+                              UNION ALL
+                              SELECT 'NAG_' + CAST(hostObjectId AS VARCHAR(50)) AS appId, COALESCE(displayName, hostName) AS appName, currentState AS status FROM nagiosApps";
 
                 using (var command = new SqlCommand(query, connection))
                 using (var reader = await command.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
-                        var appId = reader.GetInt32(0).ToString();
+                        var appId = reader.GetString(0);
                         var appName = reader.GetString(1);
                         var currentStatus = reader.GetInt32(2).ToString();
 
