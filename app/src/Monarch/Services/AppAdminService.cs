@@ -35,9 +35,9 @@ namespace Monarch.Services
         /// <summary>
         /// Retrieves all Monarch-managed applications from monarch.apps
         /// </summary>
-        public async Task<List<MonarchApp>> GetAllAppsAsync()
+        public async Task<List<AppModel>> GetAllAppsAsync()
         {
-            var apps = new List<MonarchApp>();
+            var apps = new List<AppModel>();
 
             using (var connection = new SqlConnection(_monarchConnectionString))
             {
@@ -48,7 +48,7 @@ namespace Monarch.Services
                 {
                     while (await reader.ReadAsync())
                     {
-                        apps.Add(new MonarchApp
+                        apps.Add(new AppModel
                         {
                             AppId = reader.GetInt32(0),
                             AppName = reader.GetString(1),
@@ -76,9 +76,9 @@ namespace Monarch.Services
         /// <summary>
         /// Retrieves a single Monarch app by its ID
         /// </summary>
-        public async Task<MonarchApp?> GetAppByIdAsync(int appId)
+        public async Task<AppModel?> GetAppByIdAsync(int appId)
         {
-            MonarchApp? app = null;
+            AppModel? app = null;
 
             using (var connection = new SqlConnection(_monarchConnectionString))
             {
@@ -91,7 +91,7 @@ namespace Monarch.Services
                     {
                         if (await reader.ReadAsync())
                         {
-                            app = new MonarchApp
+                            app = new AppModel
                             {
                                 AppId = reader.GetInt32(0),
                                 AppName = reader.GetString(1),
@@ -138,7 +138,7 @@ namespace Monarch.Services
         /// <summary>
         /// Updates an existing app's integration configuration
         /// </summary>
-        public async Task UpdateAppAsync(MonarchApp app)
+        public async Task UpdateAppAsync(AppModel app)
         {
             using (var connection = new SqlConnection(_monarchConnectionString))
             {
@@ -170,122 +170,25 @@ namespace Monarch.Services
         }
 
         /// <summary>
-        /// Deletes a Monarch application by ID
-        /// </summary>
-        public async Task DeleteAppAsync(int appId)
-        {
-            using (var connection = new SqlConnection(_monarchConnectionString))
-            {
-                await connection.OpenAsync();
-
-                // Remove related mappings first
-                using (var cmd = new SqlCommand("DELETE FROM appSlackChannels WHERE appId = @appId", connection))
-                {
-                    cmd.Parameters.AddWithValue("@appId", appId);
-                    await cmd.ExecuteNonQueryAsync();
-                }
-                using (var cmd = new SqlCommand("DELETE FROM appJiraWorkspaces WHERE appId = @appId", connection))
-                {
-                    cmd.Parameters.AddWithValue("@appId", appId);
-                    await cmd.ExecuteNonQueryAsync();
-                }
-                using (var cmd = new SqlCommand("DELETE FROM apps WHERE appId = @appId", connection))
-                {
-                    cmd.Parameters.AddWithValue("@appId", appId);
-                    await cmd.ExecuteNonQueryAsync();
-                }
-            }
-        }
-
-        // ===== Discovered Monitoring Apps (read-only from monapi) =====
-
-        /// <summary>
-        /// Syncs discovered New Relic apps into monarch.apps so dashboard apps
-        /// appear in the admin dropdown. Only creates entries for apps not yet linked.
-        /// </summary>
-        public async Task SyncDiscoveredAppsAsync()
-        {
-            try
-            {
-                // Get discovered New Relic app IDs and names from monapi
-                var discoveredApps = new List<(string Id, string Name)>();
-                using (var monapiConn = new SqlConnection(_monapiConnectionString))
-                {
-                    await monapiConn.OpenAsync();
-                    using (var command = new SqlCommand("SELECT appId, appName FROM newRelicApps", monapiConn))
-                    using (var reader = await command.ExecuteReaderAsync())
-                    {
-                        while (await reader.ReadAsync())
-                        {
-                            discoveredApps.Add((reader.GetValue(0).ToString()!, reader.GetString(1)));
-                        }
-                    }
-                }
-
-                if (!discoveredApps.Any()) return;
-
-                // Get existing monarch apps that are already linked to a New Relic app
-                var linkedNewRelicIds = new HashSet<string>();
-                using (var monarchConn = new SqlConnection(_monarchConnectionString))
-                {
-                    await monarchConn.OpenAsync();
-                    using (var command = new SqlCommand("SELECT newRelicId FROM apps WHERE newRelicId IS NOT NULL AND newRelicId != ''", monarchConn))
-                    using (var reader = await command.ExecuteReaderAsync())
-                    {
-                        while (await reader.ReadAsync())
-                        {
-                            linkedNewRelicIds.Add(reader.GetString(0));
-                        }
-                    }
-                }
-
-                // Create monarch.apps entries for any unlinked discovered apps
-                foreach (var (id, name) in discoveredApps)
-                {
-                    if (!linkedNewRelicIds.Contains(id))
-                    {
-                        using (var conn = new SqlConnection(_monarchConnectionString))
-                        {
-                            await conn.OpenAsync();
-                            var insertQuery = "INSERT INTO apps (appName, status, newRelicId) VALUES (@appName, @status, @newRelicId)";
-                            using (var command = new SqlCommand(insertQuery, conn))
-                            {
-                                command.Parameters.AddWithValue("@appName", name);
-                                command.Parameters.AddWithValue("@status", "Active");
-                                command.Parameters.AddWithValue("@newRelicId", id);
-                                await command.ExecuteNonQueryAsync();
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error syncing discovered apps: {ex.Message}");
-            }
-        }
-
-        /// <summary>
         /// Retrieves all New Relic applications discovered by the monapi-worker
         /// </summary>
-        public async Task<List<DiscoveredNewRelicApp>> GetDiscoveredNewRelicAppsAsync()
+        public async Task<List<NewRelicApp>> GetDiscoveredNewRelicAppsAsync()
         {
-            var apps = new List<DiscoveredNewRelicApp>();
+            var apps = new List<NewRelicApp>();
 
             using (var connection = new SqlConnection(_monapiConnectionString))
             {
                 await connection.OpenAsync();
-                var query = "SELECT appId, appName, status FROM newRelicApps ORDER BY appName";
+                var query = "SELECT appId, appName FROM newRelicApps ORDER BY appName";
                 using (var command = new SqlCommand(query, connection))
                 using (var reader = await command.ExecuteReaderAsync())
                 {
                     while (await reader.ReadAsync())
                     {
-                        apps.Add(new DiscoveredNewRelicApp
+                        apps.Add(new NewRelicApp
                         {
                             AppId = reader.GetValue(0).ToString() ?? string.Empty,
                             AppName = reader.GetString(1),
-                            Status = reader.GetValue(2).ToString() ?? string.Empty
                         });
                     }
                 }
@@ -297,26 +200,25 @@ namespace Monarch.Services
         /// <summary>
         /// Retrieves all Nagios hosts discovered by the monapi-worker
         /// </summary>
-        public async Task<List<DiscoveredNagiosApp>> GetDiscoveredNagiosAppsAsync()
+        public async Task<List<NagiosApp>> GetDiscoveredNagiosAppsAsync()
         {
-            var apps = new List<DiscoveredNagiosApp>();
+            var apps = new List<NagiosApp>();
 
             try
             {
                 using (var connection = new SqlConnection(_monapiConnectionString))
                 {
                     await connection.OpenAsync();
-                    var query = "SELECT appId, appName, status FROM nagiosApps ORDER BY appName";
+                    var query = "SELECT appId, appName FROM nagiosApps ORDER BY appName";
                     using (var command = new SqlCommand(query, connection))
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
-                            apps.Add(new DiscoveredNagiosApp
+                            apps.Add(new NagiosApp
                             {
                                 AppId = reader.GetString(0),
                                 AppName = reader.GetString(1),
-                                Status = reader.GetString(2)
                             });
                         }
                     }
@@ -675,6 +577,49 @@ namespace Monarch.Services
             catch
             {
                 return null;
+            }
+        }
+
+        public async Task<int> CreateFilterAsync(FilterModel filter)
+        {
+            using (var conn = new SqlConnection(_monarchConnectionString))
+            {
+                await conn.OpenAsync();
+                var sql = "INSERT INTO filters name OUTPUT INSERTED.filterId VALUES @name";
+
+                using (var cmd = new SqlCommand(query, conn))
+                {
+                cmd.Parameters.AddWithValue("@name", filter.FilterName);
+                var result = await cmd.ExecuteScalarAsync();
+                return Convert.ToInt32(result);
+                }
+            }
+        }
+
+        private async Task SaveAppFiltersAsync(int appId, List<int> filterIds)
+        {
+            using (var conn = new SqlConnection(_monarchConnectionString))
+            {
+                await conn.OpenAsync();
+
+                using (var cmd = new SqlCommand("DELETE FROM appFilters WHERE appId = @appId", conn))
+                {
+                    cmd.Paramters.AddWithValue("@appId", appId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+
+                if (filterIds != null)
+                {
+                    foreach (var filterId in filterIds)
+                    {
+                        using (var cmd = new SqlCommand("INSERT INTO appFilters (appId, filterId) VALUES (@appId, @filterId)", conn))
+                        {
+                            cmd.Parameters.AddWithValue("@appId", appId);
+                            cmd.Parameters.AddWithValue("@filterId", filterId);
+                            await cmd.ExecuteNonQueryAsync();
+                        }
+                    }
+                }
             }
         }
     }

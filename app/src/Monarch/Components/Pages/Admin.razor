@@ -12,8 +12,10 @@ Monarch Admin Page
 @using Monarch.Components
 @using Monarch.Models
 @using Monarch.Services
-@inject AppAdminService AppService
+@inject AppAdminService AdminService
 @inject SlackAdminService SlackService
+@inject AppCreationService CreationService
+
 @rendermode InteractiveServer
 
 <PageTitle>Admin Console - Monarch</PageTitle>
@@ -265,15 +267,15 @@ Monarch Admin Page
 
 @code {
     // Data collections
-    private List<MonarchApp> monarchApps = new();
-    private List<DiscoveredNewRelicApp> discoveredNewRelicApps = new();
-    private List<DiscoveredNagiosApp> discoveredNagiosApps = new();
+    private List<AppModel> monarchApps = new();
+    private List<NewRelicApp> discoveredNewRelicApps = new();
+    private List<NagiosApp> discoveredNagiosApps = new();
     private List<SlackChannel> slackChannels = new();
     private List<JiraWorkspaceOption> jiraWorkspaces = new();
 
     // Form state
     private int selectedAppId = 0;
-    private MonarchApp? currentApp;
+    private AppModel? currentApp;
     private bool isNewApp = false;
     private bool showCreateForm = false;
     private string newAppName = "";
@@ -300,14 +302,11 @@ Monarch Admin Page
     {
         try
         {
-            // Sync discovered apps into monarch.apps so dashboard apps appear in the dropdown
-            await AppService.SyncDiscoveredAppsAsync();
-
-            monarchApps = await AppService.GetAllAppsAsync();
-            discoveredNewRelicApps = await AppService.GetDiscoveredNewRelicAppsAsync();
-            discoveredNagiosApps = await AppService.GetDiscoveredNagiosAppsAsync();
+            monarchApps = await CreationService.GetMonarchAppsAsync();
+            discoveredNewRelicApps = await AdminService.GetDiscoveredNewRelicAppsAsync();
+            discoveredNagiosApps = await AdminService.GetDiscoveredNagiosAppsAsync();
             slackChannels = SlackService.GetChannels();
-            jiraWorkspaces = await AppService.GetJiraWorkspacesAsync();
+            jiraWorkspaces = await AdminService.GetJiraWorkspacesAsync();
         }
         catch (Exception ex)
         {
@@ -324,7 +323,7 @@ Monarch Admin Page
         isNewApp = false;
         if (selectedAppId > 0)
         {
-            currentApp = await AppService.GetAppByIdAsync(selectedAppId);
+            currentApp = await AdminService.GetAppByIdAsync(selectedAppId);
         }
         else
         {
@@ -352,11 +351,11 @@ Monarch Admin Page
             return;
 
         // Prepare a temporary MonarchApp object - don't save to DB yet
-        currentApp = new MonarchApp
+        currentApp = new AppModel
         {
             AppId = 0, // Will be assigned after save
             AppName = newAppName.Trim(),
-            Status = "Active",
+            Status = (StatusType)3,
             NewRelicId = "",
             NagiosId = "",
             SlackAlert = false,
@@ -417,9 +416,9 @@ Monarch Admin Page
             // Use workspace key as the name
             newJiraWorkspace.WorkspaceName = newJiraWorkspace.WorkspaceKey;
             
-            await AppService.AddJiraWorkspaceAsync(newJiraWorkspace);
+            await AdminService.AddJiraWorkspaceAsync(newJiraWorkspace);
             newJiraWorkspace = new JiraWorkspaceOption();
-            jiraWorkspaces = await AppService.GetJiraWorkspacesAsync();
+            jiraWorkspaces = await AdminService.GetJiraWorkspacesAsync();
         }
         catch (Exception ex)
         {
@@ -439,7 +438,7 @@ Monarch Admin Page
             if (isNewApp)
             {
                 // Create the app in database first
-                var newId = await AppService.CreateAppAsync(currentApp.AppName);
+                var newId = await AdminService.CreateAppAsync(currentApp.AppName);
                 currentApp.AppId = newId;
                 isNewApp = false;
             }
@@ -448,7 +447,7 @@ Monarch Admin Page
             var previousChannels = new List<string>();
             if (currentApp.AppId > 0)
             {
-                var existingApp = await AppService.GetAppByIdAsync(currentApp.AppId);
+                var existingApp = await AdminService.GetAppByIdAsync(currentApp.AppId);
                 if (existingApp != null)
                 {
                     previousChannels = existingApp.SelectedSlackChannels;
@@ -459,7 +458,7 @@ Monarch Admin Page
                 .ToList();
 
             // Update with all mappings
-            await AppService.UpdateAppAsync(currentApp);
+            await AdminService.UpdateAppAsync(currentApp);
 
             // Send Slack notification to newly added channels
             foreach (var channelKey in newlyAddedChannels)
@@ -508,7 +507,7 @@ Monarch Admin Page
 
         try
         {
-            var result = await AppService.SendTestJiraTicketAsync(workspaceKey);
+            var result = await AdminService.SendTestJiraTicketAsync(workspaceKey);
             
             if (result.success)
             {

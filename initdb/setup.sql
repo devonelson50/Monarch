@@ -250,10 +250,10 @@ IF OBJECT_ID('apps', 'U') IS NULL
 BEGIN
     CREATE TABLE apps (
         appId INT IDENTITY(1,1) PRIMARY KEY,
-        newRelicId VARCHAR(100),
-        nagiosId VARCHAR(100),
+        newRelicId INT,
+        nagiosId INT,
         appName VARCHAR(100) NOT NULL,
-        status VARCHAR(100) NOT NULL,
+        status INT NOT NULL,
         mostRecentIncidentId VARCHAR(100),
         slackAlert BIT DEFAULT 0,
         jiraAlert BIT DEFAULT 0,
@@ -277,6 +277,24 @@ IF OBJECT_ID('appTeams', 'U') IS NULL
 BEGIN
     CREATE TABLE appTeams (
         teamId INT NOT NULL,
+        appId INT NOT NULL
+    );
+END
+GO
+
+IF OBJECT_ID('filters', 'U') IS NULL
+BEGIN
+    CREATE TABLE filters (
+        filterId INT IDENTITY(1,1) PRIMARY KEY,
+        filterName VARCHAR(100)
+    );
+END
+GO
+
+IF OBJECT_ID('appFilters', 'U') IS NULL
+BEGIN
+    CREATE TABLE appFilters (
+        filterId INT NOT NULL,
         appId INT NOT NULL
     );
 END
