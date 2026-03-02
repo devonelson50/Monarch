@@ -3,6 +3,7 @@ Conner Hammonds
 Monarch Dashboard Page
  - Displays a list of applications with their statuses,
  - Allows sorting by status or alphabetically
+ - Allows filtering by all custom filters
  - Styles the page based on the Figma Mockup
 *@
 
@@ -11,7 +12,8 @@ Monarch Dashboard Page
 @using Monarch.Services
 @using Microsoft.Data.SqlClient
 @rendermode InteractiveServer
-@inject AppCreationService Service
+@inject AppCreationService CreationService
+@inject AppLoadService LoadService
 
 <PageTitle>Monarch</PageTitle>
 
@@ -20,7 +22,37 @@ Monarch Dashboard Page
 <div class="dashboard">
     <header class="dashboard-header">
         <div class="filter-section">
-            <select class="filter-select" @onchange="OnSortChanged" value="@selectedSort">
+
+            <!-- Below is a custom multi-select for filtering -->
+            <div class="custom-multi-select">
+                <!-- When clicked, dropdown will open -->
+                <button class="filter-select dropdown-toggle" @onclick="ToggleFilterDropdown">
+                    <!-- Shows amount of filters currently in use on dropdown cover -->
+                    Filter by: @(selectedFilterIds.Count == 0 ? "None" : $"{selectedFilterIds.Count} selected")
+                    <span class="dropdown-arrow">▼</span>
+                </button>
+
+                <!-- Code for when dropdown is open -->
+                @if (isFilterDropdownOpen)
+                {
+                    <div class="dropdown-menu shadow">
+                        <!-- Creates checkbox area for each filter in system -->
+                        @foreach (var filter in availableFilters)
+                        {
+                            <label class="dropdown-item custom-checkbox">
+                                <!-- Is already checked if the id of the filter is found in the list of selected filters -->
+                                <!-- Calls filter toggle method when checkbox changes -->
+                                <input  type="checkbox"
+                                        checked="@selectedFilterIds.Contains(filter.FilterId)"
+                                        @onchange="@(e => OnFilterToggled(filter.FilterId, (bool)(e.Value ?? false)))" />
+                                @filter.FilterName
+                            </label>
+                        }
+                    </div>
+                }
+            </div>
+
+            <select class="sort-select" @onchange="OnSortChanged" value="@selectedSort">
                 <option value="status">Sort by: Status</option>
                 <option value="alpha">Sort by: Alphabetical</option>
             </select>
@@ -52,16 +84,30 @@ Monarch Dashboard Page
 </div>
 
 @code {
+    //List of applications currently displayed
     private List<AppModel> applications = new();
+    //Backend list of applications for manipulation and then copied to currently displayed
     private List<AppModel> allApplications = new();
     private string selectedSort = "status";
     private int? draggingId;
     private int? dragOverId;
     private bool isLoading = true;
+    private bool isFilterDropdownOpen = false;
     private System.Threading.Timer? refreshTimer;
+    private List<FilterModel> availableFilters = new();
+    private List<int> selectedFilterIds = new();
 
     protected override async Task OnInitializedAsync()
     {
+        try
+        {
+            availableFilters = await LoadService.GetAllFiltersAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading filters: {ex.Message}");
+        }
+
         await LoadApplicationsFromDatabase();
 
         // Refresh data every 30 seconds to see live updates
@@ -76,7 +122,7 @@ Monarch Dashboard Page
     {
         try
         {
-            var apps = await Service.GetMonarchAppsAsync();
+            var apps = await LoadService.GetMonarchAppsAsync();
 
             allApplications = apps;
             ApplySort();
@@ -97,11 +143,14 @@ Monarch Dashboard Page
 
         try
         {
-            var tasks = allApplications.Select(async app => 
+            var tasks = allApplications.Select<AppModel, Task<AppModel>>(async app => 
             {
                 try 
                 {
-                    return await Service.RefreshAppStatusAsync(app.AppId);
+                    var status = await LoadService.RefreshAppStatusAsync(app.AppId);
+                    var updatedApp = app;
+                    updatedApp.Status = status;
+                    return updatedApp;
                 }
                 catch 
                 {
@@ -127,8 +176,37 @@ Monarch Dashboard Page
         ApplySort();
     }
 
+    private void ToggleFilterDropdown()
+    {
+        isFilterDropdownOpen = !isFilterDropdownOpen;
+    }
+
+    private void OnFilterToggled(int filterId, bool isChecked)
+    {
+        if (isChecked)
+        {
+            selectedFilterIds.Add(filterId);
+        }
+        else
+        {
+            selectedFilterIds.Remove(filterId);
+        }
+
+        ApplySort();
+    }
+
     private void ApplySort()
     {
+
+        var filteredApps = allApplications.AsEnumerable();
+
+        if (selectedFilterIds.Any())
+        {
+            filteredApps = filteredApps.Where(app =>
+                selectedFilterIds.All(selectedId =>
+                    app.Filters.Any(f => f.FilterId == selectedId)));
+        }
+
         applications = selectedSort switch
         {
             "alpha" => allApplications.OrderBy(a => a.AppName).ToList(),
@@ -254,7 +332,7 @@ Monarch Dashboard Page
         transform: scale(1);
     }
 
-    .filter-select {
+    .sort-select {
         background-color: #3D3D3D;
         color: #FFFFFF;
         border: 1px solid #5A5A5A;
@@ -272,4 +350,30 @@ Monarch Dashboard Page
         font-size: 18px;
         font-family: 'Oswald', sans-serif;
     }
+
+    .filter-pills {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-right: auto; /* Pushes the sort dropdown to the right */
+    }
+
+    .filter-label {
+        color: #FFFFFF;
+        font-family: 'Oswald', sans-serif;
+    }
+    
+    .custom-checkbox {
+        color: #A0A0A0;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .custom-checkbox input[type="checkbox"] {
+        accent-color: #d9534f; /* Modern orange/maroon accent */
+        cursor: pointer;
+    }
+
 </style>

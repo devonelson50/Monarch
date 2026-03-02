@@ -51,10 +51,10 @@ HttpClient httpClient = new HttpClient();
 builder.Services.AddSingleton(httpClient);
 
 // Register Slack Admin Service for admin panel
-builder.Services.AddSingleton<Monarch.Services.SlackAdminService>();
+builder.Services.AddScoped<Monarch.Services.SlackAdminService>();
 
 // Register App Admin Service for application configuration management
-builder.Services.AddSingleton<Monarch.Services.AppAdminService>();
+builder.Services.AddScoped<Monarch.Services.AppAdminService>();
 
 // enable forwarding to support traefik reverse proxy
 builder.Services.Configure<ForwardedHeadersOptions>(options =>

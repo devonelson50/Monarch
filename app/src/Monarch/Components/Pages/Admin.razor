@@ -14,6 +14,7 @@ Monarch Admin Page
 @using Monarch.Services
 @inject AppAdminService AdminService
 @inject SlackAdminService SlackService
+@inject AppLoadService LoadService
 @inject AppCreationService CreationService
 
 @rendermode InteractiveServer
@@ -74,7 +75,7 @@ Monarch Admin Page
                 <div class="connection-display">
                     <div class="connection-row">
                         <span class="connection-label">New Relic</span>
-                        @if (!string.IsNullOrEmpty(currentApp.NewRelicId))
+                        @if (currentApp.NewRelicId != null)
                         {
                             var nrApp = discoveredNewRelicApps.FirstOrDefault(a => a.AppId == currentApp.NewRelicId);
                             <span class="connection-value connected">
@@ -89,7 +90,7 @@ Monarch Admin Page
                     </div>
                     <div class="connection-row">
                         <span class="connection-label">Nagios</span>
-                        @if (!string.IsNullOrEmpty(currentApp.NagiosId))
+                        @if (currentApp.NagiosId != null)
                         {
                             var nagApp = discoveredNagiosApps.FirstOrDefault(a => a.AppId == currentApp.NagiosId);
                             <span class="connection-value connected">
@@ -106,9 +107,51 @@ Monarch Admin Page
             </div>
         </div>
 
-        <!-- STEP 3: Jira Workspaces -->
+        <!-- STEP 3: Filtering -->
         <div class="form-section">
             <div class="section-number">3</div>
+            <div class="section-content">
+                <h2>Custom Filters</h2>
+                <p class="section-description">Assign custom tags to help categorize this app on the dashboard. Search for an existing filter, or type a new name and press Enter to create it.</p>
+
+                <div class="searchable-multi-select">
+                    <div class="search-box">
+                        <input type="text" 
+                               placeholder="Search filters or type to create new..." 
+                               @bind="filterSearchText" 
+                               @bind:event="oninput" 
+                               @onkeydown="HandleFilterKeyDown" />
+                        @if (!string.IsNullOrWhiteSpace(filterSearchText) && !FilteredFilters.Any(f => f.FilterName.Equals(filterSearchText, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            <span class="create-hint">Press Enter to create</span>
+                        }
+                    </div>
+
+                    <div class="dropdown-options-list shadow">
+                        @if (FilteredFilters.Any())
+                        {
+                            @foreach (var filter in FilteredFilters)
+                            {
+                                var isChecked = activeAppFilterIds.Contains(filter.FilterId);
+                                <label class="dropdown-checkbox-item">
+                                    <input type="checkbox" checked="@isChecked" 
+                                           @onchange="(e) => ToggleFilter(filter.FilterId, (bool)(e.Value ?? false))" />
+                                    <span>@filter.FilterName</span>
+                                </label>
+                            }
+                        }
+                        else if (string.IsNullOrWhiteSpace(filterSearchText))
+                        {
+                            <div class="empty-state">No filters created yet.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 4: Jira Workspaces -->
+        <div class="form-section">
+            <div class="section-number">4</div>
             <div class="section-content">
                 <h2>Jira Workspaces</h2>
                 <p class="section-description">Select which Jira workspaces should receive incident tickets for this application. You can select one or many.</p>
@@ -152,9 +195,9 @@ Monarch Admin Page
             </div>
         </div>
 
-        <!-- STEP 4: Slack Channels -->
+        <!-- STEP 5: Slack Channels -->
         <div class="form-section">
-            <div class="section-number">4</div>
+            <div class="section-number">5</div>
             <div class="section-content">
                 <h2>Slack Channels</h2>
                 <p class="section-description">Select which Slack channels should receive notifications for this application. You can select one or many.</p>
@@ -183,9 +226,9 @@ Monarch Admin Page
             </div>
         </div>
 
-        <!-- STEP 5: Confirm & Save -->
+        <!-- STEP 6: Confirm & Save -->
         <div class="form-section">
-            <div class="section-number">5</div>
+            <div class="section-number">6</div>
             <div class="section-content">
                 <h2>Review & Save</h2>
                 <p class="section-description">Review the configuration below and click save to apply changes.</p>
@@ -198,7 +241,7 @@ Monarch Admin Page
                     <div class="review-row">
                         <span class="review-label">New Relic</span>
                         <span class="review-value">
-                            @if (!string.IsNullOrEmpty(currentApp.NewRelicId))
+                            @if (currentApp.NewRelicId != null)
                             {
                                 var nrApp = discoveredNewRelicApps.FirstOrDefault(a => a.AppId == currentApp.NewRelicId);
                                 @(nrApp != null ? $"{nrApp.AppName} ({nrApp.AppId})" : currentApp.NewRelicId)
@@ -212,7 +255,7 @@ Monarch Admin Page
                     <div class="review-row">
                         <span class="review-label">Nagios</span>
                         <span class="review-value">
-                            @if (!string.IsNullOrEmpty(currentApp.NagiosId))
+                            @if (currentApp.NagiosId != null)
                             {
                                 var nagApp = discoveredNagiosApps.FirstOrDefault(a => a.AppId == currentApp.NagiosId);
                                 @(nagApp != null ? $"{nagApp.AppName} ({nagApp.AppId})" : currentApp.NagiosId)
@@ -220,6 +263,22 @@ Monarch Admin Page
                             else
                             {
                                 <span class="not-configured">Not connected</span>
+                            }
+                        </span>
+                    </div>
+                    <div class="review-row">
+                        <span class="review-label">Filters</span>
+                        <span class="review-value">
+                            @if (activeAppFilterIds.Any())
+                            {
+                                var selectedNames = availableFilters
+                                    .Where(f => activeAppFilterIds.Contains(f.FilterId))
+                                    .Select(f => f.FilterName);
+                                @string.Join(", ", selectedNames)
+                            }
+                            else
+                            {
+                                <span class="not-configured">No filters selected</span>
                             }
                         </span>
                     </div>
@@ -270,8 +329,10 @@ Monarch Admin Page
     private List<AppModel> monarchApps = new();
     private List<NewRelicApp> discoveredNewRelicApps = new();
     private List<NagiosApp> discoveredNagiosApps = new();
+    private List<FilterModel> availableFilters = new();
     private List<SlackChannel> slackChannels = new();
     private List<JiraWorkspaceOption> jiraWorkspaces = new();
+    
 
     // Form state
     private int selectedAppId = 0;
@@ -279,7 +340,15 @@ Monarch Admin Page
     private bool isNewApp = false;
     private bool showCreateForm = false;
     private string newAppName = "";
+    private string filterSearchText = "";
+    private List<int> activeAppFilterIds = new();
     private JiraWorkspaceOption newJiraWorkspace = new();
+
+    // This dynamically filters the list based on what is typed in the search box
+    private IEnumerable<FilterModel> FilteredFilters =>
+        string.IsNullOrWhiteSpace(filterSearchText)
+            ? availableFilters
+            : availableFilters.Where(f => f.FilterName.Contains(filterSearchText, StringComparison.OrdinalIgnoreCase));
 
     // Save feedback
     private string saveStatus = "";
@@ -302,9 +371,10 @@ Monarch Admin Page
     {
         try
         {
-            monarchApps = await CreationService.GetMonarchAppsAsync();
+            monarchApps = await LoadService.GetMonarchAppsAsync();
             discoveredNewRelicApps = await AdminService.GetDiscoveredNewRelicAppsAsync();
             discoveredNagiosApps = await AdminService.GetDiscoveredNagiosAppsAsync();
+            availableFilters = await LoadService.GetAllFiltersAsync();
             slackChannels = SlackService.GetChannels();
             jiraWorkspaces = await AdminService.GetJiraWorkspacesAsync();
         }
@@ -321,9 +391,10 @@ Monarch Admin Page
     {
         saveStatus = "";
         isNewApp = false;
+        activeAppFilterIds.Clear();
         if (selectedAppId > 0)
         {
-            currentApp = await AdminService.GetAppByIdAsync(selectedAppId);
+            currentApp = await LoadService.GetAppByIdAsync(selectedAppId);
         }
         else
         {
@@ -356,15 +427,16 @@ Monarch Admin Page
             AppId = 0, // Will be assigned after save
             AppName = newAppName.Trim(),
             Status = (StatusType)3,
-            NewRelicId = "",
-            NagiosId = "",
+            NewRelicId = null,
+            NagiosId = null,
             SlackAlert = false,
             JiraAlert = false,
             SmtpAlert = false,
+            Filters = new List<FilterModel>(),
             SelectedSlackChannels = new List<string>(),
             SelectedJiraWorkspaces = new List<string>()
         };
-        
+        activeAppFilterIds.Clear();
         isNewApp = true;
         showCreateForm = false;
         selectedAppId = 0;
@@ -374,6 +446,52 @@ Monarch Admin Page
     }
 
     // ===== Multi-Select Toggles =====
+
+    private void ToggleFilter(int filterId, bool isChecked)
+    {
+        if (isChecked && !activeAppFilterIds.Contains(filterId))
+        {
+            activeAppFilterIds.Add(filterId);
+        }
+        else if (!isChecked)
+        {
+            activeAppFilterIds.Remove(filterId);
+        }
+    }
+
+    private async Task HandleFilterKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(filterSearchText))
+        {
+            var exactMatch = availableFilters.FirstOrDefault(f => f.FilterName.Equals(filterSearchText, StringComparison.OrdinalIgnoreCase));
+
+            if (exactMatch == null)
+            {
+                try
+                {
+                    int newId = await AdminService.CreateFilterAsync(filterSearchText.Trim());
+                    var newFilter = new FilterModel { FilterId = newId, FilterName = filterSearchText.Trim() };
+
+                    availableFilters.Add(newFilter);
+                    activeAppFilterIds.Add(newId);
+                    filterSearchText = "";
+                }
+                catch (Exception ex)
+                {
+                    saveStatus = $"Error creating filter: {ex.Message}";
+                    saveStatusClass = "status-messsage status-error";
+                }
+            }
+            else
+            {
+                if (!activeAppFilterIds.Contains(exactMatch.FilterId))
+                {
+                    activeAppFilterIds.Add(exactMatch.FilterId);
+                }
+                filterSearchText = "";
+            }
+        }
+    }
 
     private void ToggleSlackChannel(string channelKey, bool isChecked)
     {
@@ -438,7 +556,7 @@ Monarch Admin Page
             if (isNewApp)
             {
                 // Create the app in database first
-                var newId = await AdminService.CreateAppAsync(currentApp.AppName);
+                var newId = await CreationService.CreateMonarchAppAsync(currentApp);
                 currentApp.AppId = newId;
                 isNewApp = false;
             }
@@ -447,7 +565,7 @@ Monarch Admin Page
             var previousChannels = new List<string>();
             if (currentApp.AppId > 0)
             {
-                var existingApp = await AdminService.GetAppByIdAsync(currentApp.AppId);
+                var existingApp = await LoadService.GetAppByIdAsync(currentApp.AppId);
                 if (existingApp != null)
                 {
                     previousChannels = existingApp.SelectedSlackChannels;
@@ -459,6 +577,8 @@ Monarch Admin Page
 
             // Update with all mappings
             await AdminService.UpdateAppAsync(currentApp);
+
+            await AdminService.SaveAppFiltersAsync(currentApp.AppId, activeAppFilterIds);
 
             // Send Slack notification to newly added channels
             foreach (var channelKey in newlyAddedChannels)

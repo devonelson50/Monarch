@@ -7,7 +7,7 @@ using System.Security.Cryptography.Xml;
 /*  
   Brady Brown
   App Loading Service for Monarch
-  Retrieves information from Monarch Database, primarily for Dashboard View
+  Retrieves information from Monarch and Monapi Database, primarily for Dashboard View
   Also used for retrieving data for Admin Services/Configuration
   Loads pre-existing services, filters, and refreshes application statuses
 */
@@ -16,10 +16,11 @@ namespace Monarch.Services
 {
   /*
     AppLoadService Class
-    Class that contains all methods related to retrieving information from Monarch Database
+    Class that contains all methods related to retrieving information from Monarch and Monapi Database
     Includes the following with more detail on each Method:
       - App Loading
         - GetMonarchAppsAsync()
+        - GetAppByIdAsync(int)
         - RefreshAppStatusAsync(int)
         - GetDetailsAsync(AppModel)
       - Filter Loading
@@ -115,6 +116,54 @@ namespace Monarch.Services
       return apps;
     }
 
+    /// <summary>
+    /// Conner Hammonds
+    /// Retrieves a single Monarch app by its ID
+    /// </summary>
+    public async Task<AppModel?> GetAppByIdAsync(int appId)
+    {
+      AppModel? app = null;
+
+      using (var connection = new SqlConnection(monarchConn))
+      {
+        await connection.OpenAsync();
+        var query = "SELECT appId, appName, status, newRelicId, nagiosId, slackAlert, jiraAlert, smtpAlert FROM apps WHERE appId = @appId";
+        using (var command = new SqlCommand(query, connection))
+        {
+          command.Parameters.AddWithValue("@appId", appId);
+          using (var reader = await command.ExecuteReaderAsync())
+          {
+            if (await reader.ReadAsync())
+            {
+              
+              var filters = await GetAppFiltersAsync(appId);
+              var slackConns = await GetAppSlackChannelsAsync(appId);
+              var jiraConns = await GetAppJiraWorkspacesAsync(appId);
+
+              int dbStatus = reader.GetInt32(2);
+
+              app = new AppModel
+              {
+                AppId = appId,
+                AppName = reader.GetString(1),
+                Status = (StatusType)dbStatus,
+                NewRelicId = reader.IsDBNull(3) ? null : reader.GetInt32(3),
+                NagiosId = reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                SlackAlert = reader.IsDBNull(5) ? false : reader.GetBoolean(5),
+                JiraAlert = reader.IsDBNull(6) ? false : reader.GetBoolean(6),
+                SmtpAlert = reader.IsDBNull(7) ? false : reader.GetBoolean(7),
+                SelectedJiraWorkspaces = jiraConns,
+                SelectedSlackChannels = slackConns,
+                Filters = filters
+              };
+            }
+          }
+        }
+      }
+      return app;
+    }
+
+
     /*
       Brady Brown
       RefreshAppStatusAsync Method
@@ -126,7 +175,7 @@ namespace Monarch.Services
         4. Monarch database is updated with new status
     */
 
-        public async Task<AppModel> RefreshAppStatusAsync(int appId)
+        public async Task<StatusType> RefreshAppStatusAsync(int appId)
     {
       //variables created for future reference
       int nrId = -1;
@@ -240,13 +289,8 @@ namespace Monarch.Services
         }
       }
 
-      return new AppModel 
-      { 
-        AppId = appId, 
-        Status = newStatus,
-        NewRelicId = nrId,
-        NagiosId = nId
-      };
+      //Returns status
+      return newStatus;
     }
 
     /*
