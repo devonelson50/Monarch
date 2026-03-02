@@ -177,9 +177,6 @@ BEGIN
 END
 GO
 
--- Nagios Incidents TBD
-
-
 IF OBJECT_ID('jira', 'U') IS NULL
 BEGIN
     CREATE TABLE jira (

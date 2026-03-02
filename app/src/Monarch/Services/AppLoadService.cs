@@ -67,7 +67,7 @@ namespace Monarch.Services
             mostRecentIncidentId, 
             slackAlert, 
             jiraAlert, 
-            smtpAlert,
+            smtpAlert
           FROM apps";
 
         using (var cmd = new SqlCommand(sql, conn))
@@ -415,10 +415,10 @@ namespace Monarch.Services
             f.filterName
           FROM 
             appFilters af
-          WHERE 
-            af.appId = @appId
           LEFT JOIN
-            Filters f ON af.filterId = f.filterId";
+            filters f ON af.filterId = f.filterId
+          WHERE 
+            af.appId = @appId";
 
         using (var cmd = new SqlCommand(sql, conn))
         {

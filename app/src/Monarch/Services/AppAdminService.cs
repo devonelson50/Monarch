@@ -105,7 +105,7 @@ namespace Monarch.Services
                 using (var connection = new SqlConnection(_monapiConnectionString))
                 {
                     await connection.OpenAsync();
-                    var query = "SELECT appId, appName FROM nagiosApps ORDER BY appName";
+                    var query = "SELECT hostObjectId, hostName FROM nagiosApps ORDER BY hostName";
                     using (var command = new SqlCommand(query, connection))
                     using (var reader = await command.ExecuteReaderAsync())
                     {
@@ -492,7 +492,7 @@ namespace Monarch.Services
 
                 //Query to input string into table
                 //Also returns created auto id
-                var sql = "INSERT INTO filters (name) OUTPUT INSERTED.filterId VALUES (@name)";
+                var sql = "INSERT INTO filters (filterName) OUTPUT INSERTED.filterId VALUES (@name)";
 
                 using (var cmd = new SqlCommand(sql, conn))
                 {

@@ -43,6 +43,9 @@ var monarchConnectionString = $"Server=sqlserver;Database=monarch;User Id=monarc
 builder.Services.AddScoped<AppCreationService>(sp =>
     new AppCreationService(monapiConnectionString, monarchConnectionString));
 
+builder.Services.AddScoped<AppLoadService>(sp =>
+    new AppLoadService(monapiConnectionString, monarchConnectionString));
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 

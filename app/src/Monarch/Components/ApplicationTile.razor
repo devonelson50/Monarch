@@ -7,7 +7,7 @@ Monarch Application Tile Component
 
 @using Monarch.Models
 @using Monarch.Services
-@inject AppCreationService Service
+@inject AppLoadService LoadService
 
 <div class="app-tile @GetStatusClass() @(IsExpanded ? "expanded" : string.Empty)">
     <div class="tile-header">
@@ -45,7 +45,7 @@ Monarch Application Tile Component
 
                 <div class="platform-grid">
                     
-                    @if (!string.IsNullOrEmpty(App.NewRelicId))
+                    @if (App.NewRelicId != -1)
                     {
                         <div class="platform-card new-relic">
                             <div class="card-header">
@@ -74,7 +74,7 @@ Monarch Application Tile Component
                         </div>
                     }
 
-                    @if (!string.IsNullOrEmpty(App.NagiosId))
+                    @if (App.NagiosId != -1)
                     {
                         <div class="platform-card nagios">
                             <div class="card-header">
@@ -141,7 +141,7 @@ Monarch Application Tile Component
             isLoadingDetails = true;
             try
             {
-                details = await Service.GetDetailsAsync(App);
+                details = await LoadService.GetDetailsAsync(App);
             }
             catch (Exception ex)
             {

@@ -363,17 +363,66 @@ Monarch Dashboard Page
         font-family: 'Oswald', sans-serif;
     }
     
-    .custom-checkbox {
-        color: #A0A0A0;
+/* Wraps the button and the menu to keep them together */
+    .custom-multi-select {
+        position: relative;
+        display: inline-block;
+        margin-right: auto; /* Pushes the sort dropdown to the right */
+    }
+
+    /* Styles the button to perfectly match your existing sort select */
+    .dropdown-toggle {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 160px;
         cursor: pointer;
+    }
+
+    .dropdown-arrow {
+        font-size: 10px;
+        margin-left: 8px;
+    }
+
+    /* The floating menu containing the checkboxes */
+    .dropdown-menu {
+        position: absolute;
+        top: 110%;
+        left: 0;
+        width: 200px;
+        background-color: #3D3D3D;
+        border: 1px solid #5A5A5A;
+        border-radius: 6px;
+        z-index: 2000;
+        max-height: 300px;
+        overflow-y: auto;
+        padding: 8px 0;
+    }
+
+    /* Styles each individual row in the menu */
+    .dropdown-item {
+        display: block;
+        padding: 8px 16px;
+        color: #FFFFFF;
+        cursor: pointer;
+        font-family: 'Oswald', sans-serif;
+        font-size: 14px;
+        transition: background-color 0.2s;
+    }
+
+    .dropdown-item:hover {
+        background-color: #4D4D4D;
+    }
+
+    /* Keeps your checkbox styling */
+    .custom-checkbox {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
+        margin: 0;
     }
-
     .custom-checkbox input[type="checkbox"] {
-        accent-color: #d9534f; /* Modern orange/maroon accent */
+        accent-color: #d9534f;
         cursor: pointer;
     }
-
 </style>
