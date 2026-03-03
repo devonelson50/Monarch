@@ -3,47 +3,90 @@
 
 - [Monarch Deployment Instructions](#monarch-deployment-instructions)
   - [Overview](#overview)
+  - [Connection Requirements](#connection-requirements)
     - [Outbound Connectivity Requirements](#outbound-connectivity-requirements)
-      - [Monapi Service Worker Container](#monapi-service-worker-container)
     - [Inbound Connectivity Requirements](#inbound-connectivity-requirements)
-      - [Reverse Proxy Recommendations](#reverse-proxy-recommendations)
-  - [Container Stack Configuration](#container-stack-configuration)
-    - [Environment Variables](#environment-variables)
-      - [monapi-worker: nagios\_uri](#monapi-worker-nagios_uri)
-    - [Docker Secrets](#docker-secrets)
-      - [Nagios API Key](#nagios-api-key)
-      - [New Relic API Key](#new-relic-api-key)
-      - [Jira API Key](#jira-api-key)
-      - [OIDC Client Secret](#oidc-client-secret)
-      - [Slack Webhooks](#slack-webhooks)
-      - [Kafka Connection](#kafka-connection)
-      - [SQL Credentials](#sql-credentials)
-    - [OIDC Client Configuration](#oidc-client-configuration)
-      - [Generate a Unique Client Secret](#generate-a-unique-client-secret)
-      - [Set the OIDC Client Secret in Docker Secrets](#set-the-oidc-client-secret-in-docker-secrets)
-      - [Update Keycloak's Configuration](#update-keycloaks-configuration)
-      - [Additional Notes Regarding OIDC Configuration](#additional-notes-regarding-oidc-configuration)
+    - [Certificate Trust Requirements](#certificate-trust-requirements)
+  - [Environment Variables](#environment-variables)
+    - [monapi-worker: nagios\_uri](#monapi-worker-nagios_uri)
+    - [monapi-worker: kafka\_server](#monapi-worker-kafka_server)
+    - [monapi-worker: kafka\_port](#monapi-worker-kafka_port)
+    - [monapi-worker: kafka\_user](#monapi-worker-kafka_user)
+  - [Docker Secrets](#docker-secrets)
+    - [Nagios API Key](#nagios-api-key)
+    - [New Relic API Key](#new-relic-api-key)
+    - [Jira API Key](#jira-api-key)
+    - [OIDC Client Secret](#oidc-client-secret)
+    - [Slack Webhooks](#slack-webhooks)
+    - [Kafka Password](#kafka-password)
+    - [SQL Credentials](#sql-credentials)
+  - [OIDC Client Configuration](#oidc-client-configuration)
+    - [Generate a Unique Client Secret](#generate-a-unique-client-secret)
+    - [Set the OIDC Client Secret in Docker Secrets](#set-the-oidc-client-secret-in-docker-secrets)
+    - [Update Keycloak's Configuration](#update-keycloaks-configuration)
+    - [Additional Notes Regarding OIDC Configuration](#additional-notes-regarding-oidc-configuration)
+  - [Keycloak - Required Changes](#keycloak---required-changes)
+    - [Master Realm Administrative Access](#master-realm-administrative-access)
+    - [Monarch Realm Test Users](#monarch-realm-test-users)
+    - [Identity Provider Configuration](#identity-provider-configuration)
+    - [Saving Configuration Changes](#saving-configuration-changes)
+  - [Starting the Container Stack](#starting-the-container-stack)
+    - [mon-ca](#mon-ca)
+    - [monarch-certificate-provider](#monarch-certificate-provider)
+    - [sqlserver](#sqlserver)
+    - [keycloak](#keycloak)
+    - [monapi / monarch](#monapi--monarch)
 
 ## Overview
-> This document includes details related to deploying Monarch in a Docker environment. 
+Monarch's architecture closely follows the separation of concern, and least privilege design principles. This document describes design choices and environment considerations an administrator should be mindful of in order to successfully deploy the solution. Concepts related to the underlying host will be described in a way that is platform-agnostic. At times it may be necessary to refer to your hosting solution's documentation. The considerations described here do not need to be addressed strictly in the order in which they are presented, but all sections should be reviewed closely and accounted for during deployment.
+
+This document assumes the administrator deploying Monarch is familiar with their chosen hosting platform. If this is not the case, resources to get started with one of several popular container runtimes can be found here:
+- [Amazon AWS](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/docker-compose-quickstart.html)
+- [Docker](https://docs.docker.com/compose/install/)
+- [Google Cloud Run](https://docs.cloud.google.com/run/docs/deploy-run-compose?authuser=1)
+- [Microsoft Azure](https://learn.microsoft.com/en-us/azure/container-instances/container-instances-quickstart-portal)
+
+## Connection Requirements
 ### Outbound Connectivity Requirements
-#### Monapi Service Worker Container
+> This section describes the minimum required outbound connection requirements for Monarch to function. If your host is not subject to strict outbound connection whitelisting, this section can likely be skipped, or revisited if issues arise.
+
+| Service | FQDN | Protocol | Destination Port | Description |
+|---------|------|----------|------------------|-------------|
+| New Relic | api.newrelic.com | TCP | 443 | Retrieve monitoring data |
+| Nagios | {Your Nagios Host} | TCP | 443 | Retrieve monitoring data |
+| Jira | {Your Subdomain}.atlassian.net | TCP | 443 | Create Jira Issues |
+| Slack | hooks.slack.com | TCP | 443 | Send Slack alerts via webhook(s) |
+| DNS | * | UDP | 53 | External name resolution |
+| NTP | * | UDP | 123 | Time synchronization |
+
+The stack is delivered without the connection between `keycloak` and an external identity provider having been established. Please refer to your identity provider's documentation to for notes regarding their outbound connectivity requirements.
+
+Accurate time synchronization is required to ensure monitoring data and notifications are properly handled, and for public certificate verification.
+
+Whitelisting the required connections for relevant Online Certificate Status Protocol (OCSP), Certificate Trust List (CTL), and Certificate Revocation List (CRL) is strongly recommended.
 
 ### Inbound Connectivity Requirements
+> This section describes the required connections that must be made accessible to end users. The listening port describes the port the connection has been mapped to on the host.
 
-#### Reverse Proxy Recommendations
-Expand on these points:
+| Service | Protocol | Listening Port | Description |
+|---------|----------|----------------|-------------|
+| Monarch | TCP | 443 | Monarch Web Application |
+| Keycloak | TCP | 8443 | User Authentication |
 
-Suggest including reverse proxy in container stack
+> By default the `sqlserver` is not exposed outside of the container stack. If necessary for troubleshooting, the port can be temporarily exposed by modifying `compose.yaml`.
 
-Suggest ensuring the reverse proxy trusts mon-ca to allow
-end to end encryption with full chain of trust
+### Certificate Trust Requirements
+Monarch uses a self-signed certificate authority to allow all internal and end-user-facing connections to be encrypted with certificate verification, without the need to expose additional ports for automatic renewals through a public certificate authority. The root certificate is automatically regenerated anytime `mon-ca`'s volume is reset.
 
-## Container Stack Configuration
+We recommend installing `monarch_root_ca.crt` in the root certificate store of the user-facing reverse proxy. This will ensure all end-user traffic takes place across encrypted, verified connections from end-to-end. Anytime `mon-ca`'s volume is reset, the root certificate will need to be re-imported into the reverse proxy's certificate store.
 
-### Environment Variables
+> Monarch ships with a default `monarch_root_ca.crt`. This will automatically regenerate on the first execution of the container stack to ensure the certificate chain remains unique across Monarch instances should more than one be deployed. During deployment, be sure to import the newly generated root certificate after the first execution, rather than the default. If you import the default root certificate, we recommend removing it. Allow exported root certificates to be overwritten, rather than manually deleting them. If the certificate is manually deleted Docker may attempt to create a directory after failing to mount the certificate file.
+
+Unique end-entity certificates are generated for all services that listen to incoming traffic from clients, or on the internal Docker network. End-entity certificates expire every 24 hours, and are automatically regenerated each time `monarch-certificate-provider` is started. We recommend restarting the entire container stack every 24 hours to ensure all services apply the updated certificates. Automatic container stack restarts can be scheduled outside of business hours using crontab, or similar. Exact setup details may vary by hosting platform.
+
+## Environment Variables
 > For any environment variable not included below, we recommend leaving the default configuration in most circumstances. The below environment variables must be set or modified.
-#### monapi-worker: nagios_uri
+### monapi-worker: nagios_uri
 `nagios_uri` must be set to point the `monapi` container to the intended NagiosXI instance. Any reachable NagiosXI 24 or 26 instance is supported. This variable must be set to match Nagios' external URL 1:1, including the trailing slash. Example:
 `https://nxi.455garage.com/nagiosxi/`. The complete connection string(s) in `monapi`'s `NagiosConnector` object reference this environment variable such as:
 
@@ -57,22 +100,53 @@ If the variable is not set, or the formatting is not correct, the integration wi
 
 > If unknown, NagiosXI's external URL can be found in the webapp: `Configure > More Options > System Configuration > System Settings > General Program Settings > External URL`. In most configurations, it should be safe to directly copy and paste this value to the `nagios_uri` environment variable.
 
-### Docker Secrets
-#### Nagios API Key
-#### New Relic API Key
-#### Jira API Key
-#### OIDC Client Secret
-#### Slack Webhooks
-#### Kafka Connection
-#### SQL Credentials
-### OIDC Client Configuration
+### monapi-worker: kafka_server
+The Kafka integration is off by default. The integration is activated by populating this variable. `kafka_server` should point to the FQDN of your desired Kafka broker.
+
+Our current implementation assumes the broker will offer an encrypted connection and present a certificate signed by a publicly trusted certificate authority.
+
+### monapi-worker: kafka_port
+`kafka_port` will accept the broker's listening port. This variable must be populated, even if the standard TLS port is in use.
+### monapi-worker: kafka_user
+`kafka_user` will accept the intended user name.
+
+## Docker Secrets
+> Monarch will be delivered with all Docker Secrets configured for injection from an external source.
+
+### Nagios API Key
+This secret should exactly match the API key retrieved from your Nagios instance.
+
+### New Relic API Key
+This secret should exactly match the API key retrieved from your New Relic instance.
+
+### Jira API Key
+This secret should contain the API key retrieved from your Jira instance, and should follow the below format:
+```
+example@email.com:<api-key>
+```
+### OIDC Client Secret
+This secret must be populated with the OIDC Client Secret generated [here](#generate-a-unique-client-secret).
+### Slack Webhooks
+This secret will accept one or more webhooks stored in JSON format as shown below. The key for each webhook will be used as its display name in the Administrative Panel.
+```json
+{
+  "supportTeam": "https://hooks.slack.com/services/...",
+  "networkTeam": "https://hooks.slack.com/services/...",
+  "SOCteam": "https://hooks.slack.com/services/..." 
+}
+```
+### Kafka Password 
+This secret should exactly match the password for the account used to connect to your Kafka broker. The default configuration of our Kafka producer expects SaslSsl authentication. If certificate authentication is needed in the future, this secret could be repurposed with slight adjustments to `monapi`'s Kafka connector.
+
+### SQL Credentials
+Separate service accounts are in place for each container. Each SQL credential should be unique, and is subject to Microsoft SQL Server's default length and complexity requirements.
+
+## OIDC Client Configuration
 > This section covers the necessary steps to configure OIDC communication between the Monarch and Keycloak containers.
 
-By default, the container stack is delivered with a default OIDC client secret. This is acceptable for testing purposes, but the secret must be replaced during deployment in a production environment.
+The container stack is delivered with a default OIDC client secret. This is acceptable for testing purposes, but the secret must be replaced during deployment.
 
-#### Generate a Unique Client Secret
-> Online client secret generation tools are available, but not recommended.
-
+### Generate a Unique Client Secret
 Monarch will accept any 32-byte client secret. To generate a random secret, use the generation function included in your cloud-platform of choice. In the absence of this, the following can be used to generate a random secret from your local machine:
 
 Powershell 7:
@@ -84,23 +158,84 @@ Bash:
 head -c 32 /dev/urandom | base64
 ```
 
-#### Set the OIDC Client Secret in Docker Secrets
+### Set the OIDC Client Secret in Docker Secrets
 Set the value of the Docker Secret `monarch_oidc_client_secret` to the client secret generated in the previous step. The exact process will depend on your Docker environment.
 
-#### Update Keycloak's Configuration
-To replace the default OIDC client secret in Keycloak's configuration, open [realm.json](../keycloak/realm.json). Using the find and replace utility in your text editor, replace the single occurrence of the default secret:
+### Update Keycloak's Configuration
+To replace the default OIDC client secret in Keycloak's configuration, open `realm.json`. Using the find and replace utility in your text editor, replace the single occurrence of the default secret:
 
 Before:
-```
+```json
 "secret" : "uwvqb51RdR15FCYlqeBK72w9LdxDDXAN",
 ```
 
 After:
-```
+```json
 "secret" : "<NEW OIDC CLIENT SECRET>",
 ```
 Save the configuration, and allow the Monarch and Keycloak containers to start/restart for the changes to take effect.
 
-#### Additional Notes Regarding OIDC Configuration
-Our team initially planned to include a component to automatically generate and configure the OIDC client secret based on the value stored in the Docker Secret. While it is possible to import a client secret into the Keycloak configuration using Docker Secrets and Keycloak's API, this does not eliminate the issue of Keycloak's native configuration export including the client secret in plaintext. Because of this behavior, any future changes to Keycloak's configuration will once again leak the client secret. Implementing this automation would result in a portion of our code deliberately writing a credential to a json in plaintext. With this in mind, we have determined it is best to prioritize properly handling the client secret in the rest of the container stack to ensure the issue can be completely remediated by removing Keycloak from the container stack. As mentioned in our Risk-Based Information Security Analysis, we highly recommend configuring Monarch to interact directly with your Identity Provider of choice instead of Keycloak.
+### Additional Notes Regarding OIDC Configuration
+We initially planned to include a component to automatically generate and configure the OIDC client secret based on the value stored in the Docker Secret. While it is possible to import a client secret into the Keycloak configuration using Docker Secrets and Keycloak's API, this does not eliminate the issue of Keycloak's native configuration export including the client secret in plaintext. Because of this behavior, any future changes to Keycloak's configuration will once again leak the client secret. Implementing this automation would result in a portion of our code deliberately writing a credential to a json in plaintext. With this in mind, we have determined it is best to prioritize properly handling the client secret in the rest of the container stack to ensure the issue can be completely remediated by removing Keycloak from the container stack. As mentioned in our Risk-Based Information Security Analysis, we highly recommend configuring Monarch to interact directly with your Identity Provider of choice instead of Keycloak.
 
+## Keycloak - Required Changes
+### Master Realm Administrative Access
+By default, the master realm's administrative login is as follows:
+```
+username: admin
+password: keycloakadmin
+```
+After first sign in, a new account should be created, and the default admin account removed. We recommend following current best practices regarding password strength, and enabling multi-factor authentication.
+
+### Monarch Realm Test Users
+By default, the Monarch realm contains the following test users:
+```
+username: admin@monarch.com
+password: password
+role: Monarch Administrator
+```
+```
+username: user@monarch.com
+password: password
+role: Monarch User
+```
+These users are included by default in order to test the OIDC connection. Once testing is complete, these accounts should be deleted.
+### Identity Provider Configuration
+Please see Keycloak's [official documentation](https://www.keycloak.org/docs/latest/server_admin/index.html#_identity_broker) to connect your Identity Provider of choice. The roles `Monarch Administrator` and `Monarch User` have been configured in the Monarch realm, and can be referenced to determine the access level of each user. We recommend configuring role mapping to allow access roles to be defined in your IdP, rather than through Keycloak.
+
+### Saving Configuration Changes
+Keycloak's `realm.json` is re-ingested during each container restart. If changes are not written back to `realm.json`, they will not persist even if the Docker volume is not reset. Once the necessary configuration changes have been made, attach your shell to the `keycloak` container and run the following command:
+```bash
+export KC_DB_PASSWORD=\$(cat /run/secrets/monarch_sql_keycloak_password) && /opt/keycloak/bin/kc.sh export --file /opt/keycloak/data/import/realm.json
+```
+
+## Starting the Container Stack
+Monarch will automatically launch in order of its dependent services, which is as follows:
+
+### mon-ca
+`mon-ca` is host to the local certificate authority. This container must start first to prepare for the process of automatically generating and applying certificates. `mon-ca`'s definition in `compose.yaml` includes a modification to the entrypoint script to prevent the default script from echoing a secret to console during initial setup. If in the future an update to the default entrypoint negatively impacts `mon-ca`, this modified entrypoint may need to be re-evaluated.
+
+### monarch-certificate-provider
+Once `mon-ca` is ready, this container will start in order to execute `cert-provider.sh`. This script communicates with the certificate authority to accomplish the following:
+- Generate unique end-entity certificates for each service
+- Deploy end-entity certificates automatically using Docker Volumes
+- Distribute root, or full-chain certificates as needed to ensure each service in the stack can communicate without skipping certificate verification
+- Export the root certificate for access by the reverse proxy
+
+On some UNIX hosts, shell scripts will follow the host-level permissions when mounted as a volume. Execute permissions have already been set on `cert-provider.sh`. In the event this permission did not reflect on your new host, it may be necessary to update the permissions using:
+```bash
+chmod +x cert-provider.sh
+```
+
+### sqlserver
+After `cert-provider.sh` has successfully exited, `sqlserver`, the final dependency for all remaining services, will start. `sqlserver` uses a modified entrypoint script that allows automatic initialization, or reinitialization of the database. This initialization process prepares the necessary users, and applies Monarch's schema.
+
+On some UNIX hosts, shell scripts will follow the host-level permissions when mounted as a volume. Execute permissions have already been set on both scripts in `initdb`. In the event this permission did not reflect on your new host, it may be necessary to update the permissions using:
+```bash
+chmod +x initdb/*
+```
+### keycloak
+See [Keycloak - Required Changes](#keycloak---required-changes)
+
+### monapi / monarch
+Once the above services have successfully started, and other dependencies such as connectivity requirements and external secrets injection have been fulfilled, the user and 3rd-party-service facing containers should build and launch. After launching, connect to `monarch`'s listening port as an administrator to start configuring monitored apps.
