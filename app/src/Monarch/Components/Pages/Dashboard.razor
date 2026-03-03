@@ -21,30 +21,26 @@ Monarch Dashboard Page
 
 <div class="dashboard">
     <header class="dashboard-header">
+        @if (isFilterDropdownOpen)
+        {
+            <div class="dropdown-backdrop" @onclick="CloseFilterDropdown"></div>
+        }
         <div class="filter-section">
-
-            <!-- Below is a custom multi-select for filtering -->
+            
             <div class="custom-multi-select">
-                <!-- When clicked, dropdown will open -->
-                <button class="filter-select dropdown-toggle" @onclick="ToggleFilterDropdown">
-                    <!-- Shows amount of filters currently in use on dropdown cover -->
+                <button type="button" class="dropdown-toggle" @onclick="ToggleFilterDropdown">
                     Filter by: @(selectedFilterIds.Count == 0 ? "None" : $"{selectedFilterIds.Count} selected")
-                    <span class="dropdown-arrow">▼</span>
                 </button>
 
-                <!-- Code for when dropdown is open -->
                 @if (isFilterDropdownOpen)
                 {
-                    <div class="dropdown-menu shadow">
-                        <!-- Creates checkbox area for each filter in system -->
+                    <div class="custom-filter-menu shadow">
                         @foreach (var filter in availableFilters)
                         {
-                            <label class="dropdown-item custom-checkbox">
-                                <!-- Is already checked if the id of the filter is found in the list of selected filters -->
-                                <!-- Calls filter toggle method when checkbox changes -->
-                                <input  type="checkbox"
-                                        checked="@selectedFilterIds.Contains(filter.FilterId)"
-                                        @onchange="@(e => OnFilterToggled(filter.FilterId, (bool)(e.Value ?? false)))" />
+                            <label class="custom-filter-item custom-checkbox">
+                                <input type="checkbox"
+                                       checked="@selectedFilterIds.Contains(filter.FilterId)"
+                                       @onchange="@(e => OnFilterToggled(filter.FilterId, (bool)(e.Value ?? false)))" />
                                 @filter.FilterName
                             </label>
                         }
@@ -181,6 +177,11 @@ Monarch Dashboard Page
         isFilterDropdownOpen = !isFilterDropdownOpen;
     }
 
+    private void CloseFilterDropdown()
+    {
+        isFilterDropdownOpen = false;
+    }
+
     private void OnFilterToggled(int filterId, bool isChecked)
     {
         if (isChecked)
@@ -209,8 +210,8 @@ Monarch Dashboard Page
 
         applications = selectedSort switch
         {
-            "alpha" => allApplications.OrderBy(a => a.AppName).ToList(),
-            "status" => allApplications
+            "alpha" => filteredApps.OrderBy(a => a.AppName).ToList(),
+            "status" => filteredApps
             .OrderBy(a => a.Status switch
             {
                 StatusType.Outage => 0,
@@ -332,16 +333,6 @@ Monarch Dashboard Page
         transform: scale(1);
     }
 
-    .sort-select {
-        background-color: #3D3D3D;
-        color: #FFFFFF;
-        border: 1px solid #5A5A5A;
-        padding: 6px 10px;
-        border-radius: 6px;
-        font-family: 'Oswald', sans-serif;
-        font-size: 14px;
-    }
-
     .loading,
     .no-data {
         color: #A0A0A0;
@@ -350,79 +341,79 @@ Monarch Dashboard Page
         font-size: 18px;
         font-family: 'Oswald', sans-serif;
     }
-
-    .filter-pills {
-        display: flex;
-        gap: 12px;
-        align-items: center;
-        margin-right: auto; /* Pushes the sort dropdown to the right */
-    }
-
-    .filter-label {
-        color: #FFFFFF;
-        font-family: 'Oswald', sans-serif;
-    }
     
-/* Wraps the button and the menu to keep them together */
+   /* 1. The Shared Base (Forces them to look identical) */
+    .sort-select, .dropdown-toggle {
+        background-color: #3D3D3D;
+        color: #FFFFFF;
+        border: 1px solid #5A5A5A;
+        padding: 6px 10px;
+        border-radius: 6px;
+        font-family: 'Oswald', sans-serif;
+        font-size: 14px;
+        height: 34px; /* Explicit height ensures they line up perfectly */
+        box-sizing: border-box;
+    }
+
     .custom-multi-select {
         position: relative;
         display: inline-block;
-        margin-right: auto; /* Pushes the sort dropdown to the right */
     }
 
-    /* Styles the button to perfectly match your existing sort select */
     .dropdown-toggle {
-        display: flex;
+        display: inline-flex;
         justify-content: space-between;
         align-items: center;
         width: 160px;
-        cursor: pointer;
+        cursor: default !important;
+        appearance: none;
+        -webkit-appearance: none;
     }
 
-    .dropdown-arrow {
-        font-size: 10px;
-        margin-left: 8px;
+    .dropdown-backdrop {
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
     }
 
-    /* The floating menu containing the checkboxes */
-    .dropdown-menu {
+    .custom-filter-menu {
         position: absolute;
-        top: 110%;
+        top: 100%;
         left: 0;
-        width: 200px;
+        width: 100%; /* Matches the 160px width of the button exactly */
         background-color: #3D3D3D;
         border: 1px solid #5A5A5A;
-        border-radius: 6px;
+        border-radius: 0; /* Square edges */
         z-index: 2000;
         max-height: 300px;
         overflow-y: auto;
-        padding: 8px 0;
+        padding: 0;
+        box-sizing: border-box;
     }
 
-    /* Styles each individual row in the menu */
-    .dropdown-item {
+    .custom-filter-item {
         display: block;
-        padding: 8px 16px;
+        padding: 6px 10px;
         color: #FFFFFF;
         cursor: pointer;
         font-family: 'Oswald', sans-serif;
         font-size: 14px;
-        transition: background-color 0.2s;
+        margin: 0;
     }
 
-    .dropdown-item:hover {
-        background-color: #4D4D4D;
+    .custom-filter-item:hover {
+        background-color: #0078D4; 
     }
 
-    /* Keeps your checkbox styling */
     .custom-checkbox {
         display: flex;
         align-items: center;
         gap: 8px;
-        margin: 0;
+        cursor: default;
     }
+
     .custom-checkbox input[type="checkbox"] {
-        accent-color: #d9534f;
+        accent-color: #0078D4; /* Colors the checked box blue to match */
         cursor: pointer;
+        margin: 0;
     }
 </style>
