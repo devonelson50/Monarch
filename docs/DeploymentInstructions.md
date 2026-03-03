@@ -25,6 +25,11 @@
     - [Set the OIDC Client Secret in Docker Secrets](#set-the-oidc-client-secret-in-docker-secrets)
     - [Update Keycloak's Configuration](#update-keycloaks-configuration)
     - [Additional Notes Regarding OIDC Configuration](#additional-notes-regarding-oidc-configuration)
+  - [Keycloak - Required Changes](#keycloak---required-changes)
+    - [Master Realm Administrative Access](#master-realm-administrative-access)
+    - [Monarch Realm Test Users](#monarch-realm-test-users)
+    - [Identity Provider Configuration](#identity-provider-configuration)
+    - [Saving Configuration Changes](#saving-configuration-changes)
   - [Starting the Container Stack](#starting-the-container-stack)
     - [mon-ca](#mon-ca)
     - [monarch-certificate-provider](#monarch-certificate-provider)
@@ -173,6 +178,37 @@ Save the configuration, and allow the Monarch and Keycloak containers to start/r
 ### Additional Notes Regarding OIDC Configuration
 We initially planned to include a component to automatically generate and configure the OIDC client secret based on the value stored in the Docker Secret. While it is possible to import a client secret into the Keycloak configuration using Docker Secrets and Keycloak's API, this does not eliminate the issue of Keycloak's native configuration export including the client secret in plaintext. Because of this behavior, any future changes to Keycloak's configuration will once again leak the client secret. Implementing this automation would result in a portion of our code deliberately writing a credential to a json in plaintext. With this in mind, we have determined it is best to prioritize properly handling the client secret in the rest of the container stack to ensure the issue can be completely remediated by removing Keycloak from the container stack. As mentioned in our Risk-Based Information Security Analysis, we highly recommend configuring Monarch to interact directly with your Identity Provider of choice instead of Keycloak.
 
+## Keycloak - Required Changes
+### Master Realm Administrative Access
+By default, the master realm's administrative login is as follows:
+```
+username: admin
+password: keycloakadmin
+```
+After first sign in, a new account should be created, and the default admin account removed. We recommend following current best practices regarding password strength, and enabling multi-factor authentication.
+
+### Monarch Realm Test Users
+By default, the Monarch realm contains the following test users:
+```
+username: admin@monarch.com
+password: password
+role: Monarch Administrator
+```
+```
+username: user@monarch.com
+password: password
+role: Monarch User
+```
+These users are included by default in order to test the OIDC connection. Once testing is complete, these accounts should be deleted.
+### Identity Provider Configuration
+Please see Keycloak's [official documentation](https://www.keycloak.org/docs/latest/server_admin/index.html#_identity_broker) to connect your Identity Provider of choice. The roles `Monarch Administrator` and `Monarch User` have been configured in the Monarch realm, and can be referenced to determine the access level of each user. We recommend configuring role mapping to allow access roles to be defined in your IdP, rather than through Keycloak.
+
+### Saving Configuration Changes
+Keycloak's `realm.json` is re-ingested during each container restart. If changes are not written back to `realm.json`, they will not persist even if the Docker volume is not reset. Once the necessary configuration changes have been made, attach your shell to the `keycloak` container and run the following command:
+```bash
+export KC_DB_PASSWORD=\$(cat /run/secrets/monarch_sql_keycloak_password) && /opt/keycloak/bin/kc.sh export --file /opt/keycloak/data/import/realm.json
+```
+
 ## Starting the Container Stack
 Monarch will automatically launch in order of its dependent services, which is as follows:
 
@@ -199,7 +235,7 @@ On some UNIX hosts, shell scripts will follow the host-level permissions when mo
 chmod +x initdb/*
 ```
 ### keycloak
-This section is pending SCRUM-159.
+See [Keycloak - Required Changes](#keycloak---required-changes)
 
 ### monapi / monarch
 Once the above services have successfully started, and other dependencies such as connectivity requirements and external secrets injection have been fulfilled, the user and 3rd-party-service facing containers should build and launch. After launching, connect to `monarch`'s listening port as an administrator to start configuring monitored apps.
