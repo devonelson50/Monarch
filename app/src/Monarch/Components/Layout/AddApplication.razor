@@ -1,6 +1,8 @@
 @using Microsoft.AspNetCore.Mvc.ApplicationModels
 @using Monarch.Models
 @using Monarch.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "Admin")]
 @inject AppCreationService Service
 
 @namespace Monarch.Layout

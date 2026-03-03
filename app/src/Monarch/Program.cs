@@ -6,7 +6,8 @@ using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.AspNetCore.Antiforgery;
-using System.Security.Cryptography.X509Certificates;
+using System.Security.Claims;
+using System.Text.Json;
 using Monarch.Services;
 
 /// Devon Nelson
@@ -15,6 +16,7 @@ using Monarch.Services;
 ///     - Forward unauthenticated clients to KeyCloak for authentication
 ///     - Complete OIDC user authorization flow
 ///     - Begin the authenticated user's session
+///     - Determine the authenticated user's access level based on assigned role(s)
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -62,6 +64,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
 });
 
+// Configure OIDC authentication with cookie-based sessions
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
@@ -82,7 +85,7 @@ builder.Services.AddAuthentication(options =>
     );
     options.ResponseType = OpenIdConnectResponseType.Code;
     options.SaveTokens = true;
-    options.GetClaimsFromUserInfoEndpoint = false;
+    options.GetClaimsFromUserInfoEndpoint = true;
 
     options.Scope.Clear();
     if (!string.IsNullOrEmpty(scopeString))
@@ -94,10 +97,15 @@ builder.Services.AddAuthentication(options =>
     }
     options.CallbackPath = new Uri(redirectUri).LocalPath;
 
-    options.TokenValidationParameters.ValidIssuers = new List<string>
+    options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
     {
-        authority.Replace("monarch", "Monarch", StringComparison.OrdinalIgnoreCase),
-        publicAuthority.Replace("monarch", "Monarch", StringComparison.OrdinalIgnoreCase)
+        NameClaimType = "preferred_username",
+        RoleClaimType = ClaimTypes.Role,
+        ValidIssuers = new List<string>
+        {
+            authority.Replace("monarch", "Monarch", StringComparison.OrdinalIgnoreCase),
+            publicAuthority.Replace("monarch", "Monarch", StringComparison.OrdinalIgnoreCase)
+        }
     };
 
     options.Events = new OpenIdConnectEvents
@@ -112,12 +120,44 @@ builder.Services.AddAuthentication(options =>
             context.HandleResponse();
             context.Response.Redirect("/Error");
             return Task.CompletedTask;
+        },
+        // convert roles from realm_access claim into individual role claims
+        OnTokenValidated = context =>
+        {
+            var identity = context.Principal?.Identity as ClaimsIdentity;
+            if (identity != null)
+            {
+                var realmAccessClaim = identity.FindFirst("realm_access");
+                if (realmAccessClaim != null)
+                {
+                    using var jsonDoc = JsonDocument.Parse(realmAccessClaim.Value);
+                    if (jsonDoc.RootElement.TryGetProperty("roles", out var rolesElement))
+                    {
+                        foreach (var role in rolesElement.EnumerateArray())
+                        {
+                            var roleName = role.GetString();
+                            if (!string.IsNullOrEmpty(roleName))
+                            {
+                                identity.AddClaim(new Claim(ClaimTypes.Role, roleName));
+                            }
+                        }
+                    }
+                }
+            }
+            return Task.CompletedTask;
         }
     };
 })
 .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme);
 
-builder.Services.AddAuthorization();
+// Define role-based authorization policies
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("Admin", policy => policy.RequireRole("Monarch Administrator"));
+    // User policy may become relevant if limited guest access is needed
+    // options.AddPolicy("User", policy => policy.RequireRole("Monarch User", "Monarch Administrator"));
+});
+
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
 
@@ -127,9 +167,9 @@ var app = builder.Build();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
+app.UseForwardedHeaders();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
