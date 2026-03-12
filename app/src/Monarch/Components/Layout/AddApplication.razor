@@ -63,6 +63,28 @@
 }
 
 <style>
+  .admin-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.75);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1050; /* Keeps it above your NavBar */
+  }
+
+  /* Constrains the width and applies your dark theme */
+  .admin-card {
+    background-color: #2D2D2D; 
+    color: #FFFFFF;
+    width: 100%;
+    max-width: 500px; 
+    border: 1px solid #5A5A5A;
+    border-radius: 8px;
+  }
   .custom-dropdown 
   {
     background-color: #2D2D2D;

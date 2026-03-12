@@ -13,7 +13,12 @@ services:
     volumes:
       - ~/.vsdbg:/remote_debugger:rw
       - ./app/src/Monarch:/src/app/src/Monarch
+      - /src/app/src/Monarch/bin
+      - /src/app/src/Monarch/obj
     working_dir: /src/app/src/Monarch
     command: ["dotnet", "watch", "run", "--urls", "http://+:8080"]
     ports:
       - "8080:8080"
+  sqlserver:
+    ports:
+      - "1433:1433"
