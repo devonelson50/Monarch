@@ -6,7 +6,7 @@ using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.AspNetCore.Antiforgery;
-using System.Security.Cryptography.X509Certificates;
+using Microsoft.AspNetCore.Authentication;
 using Monarch.Services;
 
 /// Devon Nelson
@@ -148,4 +148,12 @@ app.Use(async (context, next) =>
 });
 
 app.UseAntiforgery();
+
+// Handle /logout POST requests, invalidate current session
+app.MapPost("/logout", async (HttpContext context) =>
+{
+    await context.SignOutAsync(OpenIdConnectDefaults.AuthenticationScheme);
+    await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+});
+
 app.Run();
