@@ -12,6 +12,8 @@ Monarch Admin Page
 @using Monarch.Components
 @using Monarch.Models
 @using Monarch.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "Admin")]
 @inject AppAdminService AppService
 @inject SlackAdminService SlackService
 @rendermode InteractiveServer
