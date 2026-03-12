@@ -222,10 +222,10 @@ namespace Monarch.Services
           cmd.Parameters.AddWithValue("@nrId",
             app.NewRelicId == null ? DBNull.Value : app.NewRelicId);
           cmd.Parameters.AddWithValue("@nId",
-            app.NewRelicId == null ? DBNull.Value : app.NagiosId);
+            app.NagiosId == null ? DBNull.Value : app.NagiosId);
 
           //Gets auto id result
-          var result = await cmd.ExecuteNonQueryAsync();
+          var result = await cmd.ExecuteScalarAsync();
 
           //Convert auto id into int for better referencing and returns
           return Convert.ToInt32(result);

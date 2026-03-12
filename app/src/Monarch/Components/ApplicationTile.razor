@@ -45,7 +45,7 @@ Monarch Application Tile Component
 
                 <div class="platform-grid">
                     
-                    @if (App.NewRelicId != -1)
+                    @if (App.NewRelicId != null)
                     {
                         <div class="platform-card new-relic">
                             <div class="card-header">
@@ -74,7 +74,7 @@ Monarch Application Tile Component
                         </div>
                     }
 
-                    @if (App.NagiosId != -1)
+                    @if (App.NagiosId != null)
                     {
                         <div class="platform-card nagios">
                             <div class="card-header">
