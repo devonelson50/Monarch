@@ -4,6 +4,7 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "Admin")]
 @inject AppCreationService Service
+@inject AppCreationService AppCreationService
 
 @namespace Monarch.Layout
 
@@ -113,11 +114,13 @@
   
   protected override async Task OnInitializedAsync()
   {
-    List<string> usedIds = new();
+    List<int> usedNewRelicIds = new List<int>();
+    List<int> usedNagiosIds = new List<int>();
 
     try
     {
-      usedIds = await Service.GetUsedIdsAsync();
+      usedNewRelicIds = await AppCreationService.GetUsedNewRelicIdsAsync();
+      usedNagiosIds = await AppCreationService.GetUsedNagiosIdsAsync();
     }
     catch (Exception ex)
     {
@@ -125,8 +128,8 @@
     }
     try
     {
-      var allNr = await Service.GetAvailableNewRelicAppsAsync();
-      newRelicOptions = allNr.Where(opt => !usedIds.Contains(opt.AppId)).ToList();
+      var allNr = await AppCreationService.GetAvailableNewRelicAppsAsync();
+      newRelicOptions = allNr.Where(opt => !usedNewRelicIds.Contains(opt.AppId)).ToList();
     }
     catch (Exception ex)
     {
@@ -135,8 +138,8 @@
 
     try
     {
-      var allN = await Service.GetAvailableNagiosAppsAsync();
-      nagiosOptions = allN.Where(opt => !usedIds.Contains(opt.AppId)).ToList();
+      var allN = await AppCreationService.GetAvailableNagiosAppsAsync();
+      nagiosOptions = allN.Where(opt => !usedNagiosIds.Contains(opt.AppId)).ToList();
     }
     catch (Exception ex)
     {
@@ -153,7 +156,7 @@
   {
     try
     {
-      await Service.CreateMonarchAppAsync(appModel);
+      await AppCreationService.CreateMonarchAppAsync(appModel);
 
       appModel = new();
 
