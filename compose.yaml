@@ -155,6 +155,9 @@ services:
       DOCKER_STEPCA_INIT_PASSWORD_FILE: /run/secrets/mon-ca_key
     secrets:
       - mon-ca_key
+    entrypoint: /bin/sh
+    # See issue #2270 in the smallstep repository. The default entrypoint writes mon-ca_key to console in plaintext.
+    command: -c "sed '/Your CA administrative password/d' /entrypoint.sh > /tmp/entrypoint.sh && chmod +x /tmp/entrypoint.sh && exec /tmp/entrypoint.sh step-ca /home/step/config/ca.json --password-file=/run/secrets/mon-ca_key"
   monarch-certificate-provider:
     image: smallstep/step-cli
     networks:
