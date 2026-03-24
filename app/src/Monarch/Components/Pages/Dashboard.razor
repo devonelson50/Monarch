@@ -17,7 +17,7 @@ Monarch Dashboard Page
 
 <PageTitle>Monarch</PageTitle>
 
-<NavBar />
+<NavBar OnApplicationAdded="OnApplicationAdded" />
 
 <div class="dashboard">
     <header class="dashboard-header">
@@ -92,6 +92,12 @@ Monarch Dashboard Page
     private System.Threading.Timer? refreshTimer;
     private List<FilterModel> availableFilters = new();
     private List<int> selectedFilterIds = new();
+
+    private async Task OnApplicationAdded()
+    {
+        await LoadApplicationsFromDatabase();
+        StateHasChanged();
+    }
 
     protected override async Task OnInitializedAsync()
     {

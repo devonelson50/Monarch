@@ -74,12 +74,14 @@ services:
       - monapi_certificate:/certificate
     secrets:
       - monarch_sql_monapi_password
+      - monarch_sql_monarch_password
       - monarch_newrelic_api_key
       - monarch_nagios_api_details
       - monarch_jira_api_key
       - newrelic_account_number
       - monarch_simulator_api_key
       - monarch_kafka_password
+      - monarch_slack_webhooks
     environment:
       nagios_uri: https://nxi.455garage.com/nagiosxi/ # 1:1 match with external URL in General Program Settings
       kafka_server:

@@ -12,23 +12,59 @@ public class JiraConnector
 {
     private readonly string _baseUrl;
     private readonly string _projectKey;
-    private readonly string _issueType;
     private readonly string _authHeader;
 
-    public JiraConnector(string baseUrl, string projectKey, string issueType, string emailAndToken)
+    public JiraConnector(string baseUrl, string projectKey, string emailAndToken)
     {
         _baseUrl = baseUrl.TrimEnd('/');
         _projectKey = projectKey;
-        _issueType = issueType;
         
         // Create Basic Auth header from email:token format
         var base64Credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes(emailAndToken));
         _authHeader = $"Basic {base64Credentials}";
     }
 
+    // Resolves the first available issue type ID for the Jira project
+
+    public async Task<string?> ResolveIssueTypeId()
+    {
+        try
+        {
+            var url = $"{_baseUrl}/rest/api/3/project/{_projectKey}";
+            var options = new RestClientOptions(url);
+            var client = new RestClient(options);
+            var request = new RestRequest();
+
+            request.AddHeader("Authorization", _authHeader);
+            request.AddHeader("Accept", "application/json");
+
+            var response = await client.GetAsync(request);
+            if (!response.IsSuccessful) return null;
+
+            var jNode = JsonNode.Parse(response.Content!);
+            var issueTypes = jNode?["issueTypes"]?.AsArray();
+
+            if (issueTypes == null) return null;
+
+            foreach (var issueType in issueTypes)
+            {
+                var isSubtask = issueType?["subtask"]?.GetValue<bool>() ?? false;
+                if (isSubtask) continue;
+                return issueType?["id"]?.ToString();
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error resolving issue type: {ex.Message}");
+            return null;
+        }
+    }
+
     // Creates a new Jira incident issue for an application based on template
 
-    public async Task<JiraTicket?> CreateIncidentIssue(string appName, string status, string priority = "Medium")
+    public async Task<JiraTicket?> CreateIncidentIssue(string appName, string status, string issueTypeId, string priority = "Medium", string metricDetails = "")
     {
         try
         {
@@ -42,7 +78,7 @@ public class JiraConnector
             request.AddHeader("Accept", "application/json");
 
             // Build the Jira issue payload using template
-            var payload = JiraIncidentTicket.Create(_projectKey, appName, status, priority);
+            var payload = JiraIncidentTicket.Create(_projectKey, appName, status, issueTypeId, priority, metricDetails);
 
             request.AddJsonBody(payload);
             var response = await client.PostAsync(request);

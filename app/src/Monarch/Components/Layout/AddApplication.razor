@@ -3,7 +3,6 @@
 @using Monarch.Services
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "Admin")]
-@inject AppCreationService Service
 @inject AppCreationService AppCreationService
 
 @namespace Monarch.Layout
@@ -16,9 +15,7 @@
         <button class="btn-close btn-close-white" @onclick="Close"></button>
       </div>
       <div class="card-body">
-        <EditForm Model="appModel" OnValidSubmit="HandleSubmit">
-          <DataAnnotationsValidator />
-          <ValidationSummary class="text-danger small" />
+        <EditForm Model="appModel" OnSubmit="HandleSubmit">
 
           <div class="mb-3">
             <label class="form-label">Application Name</label>
@@ -53,9 +50,14 @@
             </InputSelect>
           </div>
 
+          @if (!string.IsNullOrEmpty(errorMessage))
+          {
+            <div class="text-danger small mb-2">@errorMessage</div>
+          }
+
           <div class="d-flex justify-content-end gap-2 mt-4">
             <button type="button" class="btn btn-outline-secondary" @onclick="Close">Cancel</button>
-            <button type="submit" class="btn btn-primary">Save Application</button>
+            <button type="submit" class="btn btn-primary" disabled="@isSaving">@(isSaving ? "Saving..." : "Save Application")</button>
           </div>
         </EditForm>
       </div>
@@ -108,6 +110,8 @@
   [Parameter] public EventCallback OnApplicationAdded { get; set; }
 
   private AppModel appModel = new();
+  private string errorMessage = "";
+  private bool isSaving = false;
 
   private List<NewRelicApp> newRelicOptions = new();
   private List<NagiosApp> nagiosOptions = new();
@@ -154,13 +158,22 @@
 
   private async Task HandleSubmit()
   {
+    if (string.IsNullOrWhiteSpace(appModel.AppName))
+    {
+      errorMessage = "Application name is required.";
+      return;
+    }
+
+    isSaving = true;
+    errorMessage = "";
+
     try
     {
       await AppCreationService.CreateMonarchAppAsync(appModel);
 
       appModel = new();
 
-      if(OnApplicationAdded.HasDelegate)
+      if (OnApplicationAdded.HasDelegate)
       {
         await OnApplicationAdded.InvokeAsync();
       }
@@ -169,7 +182,12 @@
     }
     catch (Exception ex)
     {
+      errorMessage = $"Failed to save application: {ex.Message}";
       Console.WriteLine($"Error saving app: {ex.Message}");
+    }
+    finally
+    {
+      isSaving = false;
     }
   }
 }
