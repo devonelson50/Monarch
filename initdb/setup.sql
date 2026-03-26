@@ -111,10 +111,13 @@ ALTER ROLE db_owner ADD MEMBER keycloak;
 GO
 
 -- monarch account needs r/w to monarch db
+-- monapi account needs read-only to monarch db
 USE monarch;
 CREATE USER monarch FOR LOGIN monarch;
+CREATE USER monapi FOR LOGIN monapi;
 ALTER ROLE db_datareader ADD MEMBER monarch;
 ALTER ROLE db_datawriter ADD MEMBER monarch;
+ALTER ROLE db_datareader ADD MEMBER monapi;
 GO
 
 -- monapi account needs r/w to monapi db

@@ -35,8 +35,7 @@ public class Worker : BackgroundService
     {
         // Initialize database connections
         var monapiPassword = File.ReadAllText("/run/secrets/monarch_sql_monapi_password").Trim();
-        var monarchPassword = File.ReadAllText("/run/secrets/monarch_sql_monarch_password").Trim();
-        _monarchConnStr = $"Server=sqlserver,1433;Database=monarch;User Id=monarch;Password={monarchPassword};TrustServerCertificate=False;";
+        _monarchConnStr = $"Server=sqlserver,1433;Database=monarch;User Id=monapi;Password={monapiPassword};TrustServerCertificate=False;";
         _monapiConnStr = $"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={monapiPassword};TrustServerCertificate=False;";
 
         ProcessStartInfo psi = new ProcessStartInfo

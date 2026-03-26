@@ -74,7 +74,6 @@ services:
       - monapi_certificate:/certificate
     secrets:
       - monarch_sql_monapi_password
-      - monarch_sql_monarch_password
       - monarch_newrelic_api_key
       - monarch_nagios_api_details
       - monarch_jira_api_key
