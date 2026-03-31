@@ -256,15 +256,14 @@ public class JiraManager
                 await connection.OpenAsync();
                 
                 var query = @"
-                    INSERT INTO jira (ticketId, incidentId, teamId, issueKey, openTime, summary, description) 
-                    VALUES (@ticketId, @incidentId, @teamId, @issueKey, @openTime, @summary, @description)";
+                    INSERT INTO jira (ticketId, incidentId, issueKey, openTime, summary, description) 
+                    VALUES (@ticketId, @incidentId, @issueKey, @openTime, @summary, @description)";
                 
                 using (var command = new SqlCommand(query, connection))
                 {
                     // Use a hash of the issue key as the ticketId
                     command.Parameters.AddWithValue("@ticketId", Math.Abs(ticket.IssueKey.GetHashCode()));
                     command.Parameters.AddWithValue("@incidentId", incidentId);
-                    command.Parameters.AddWithValue("@teamId", 1); // Default team, can be enhanced later
                     command.Parameters.AddWithValue("@issueKey", ticket.IssueKey);
                     command.Parameters.AddWithValue("@openTime", ticket.CreatedAt);
                     command.Parameters.AddWithValue("@summary", ticket.Summary);
