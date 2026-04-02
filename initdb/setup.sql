@@ -147,17 +147,6 @@ BEGIN
     );END
 GO
 
-IF OBJECT_ID('newRelicIncidents', 'U') IS NULL
-BEGIN
-    CREATE TABLE newRelicIncidents (
-        incidentId VARCHAR(100) PRIMARY KEY,
-        appId INT NOT NULL,
-        openTime DATETIME NOT NULL,
-        closeTime DATETIME
-    );
-END
-GO
-
 IF OBJECT_ID('nagiosApps', 'U') IS NULL
 BEGIN
     CREATE TABLE nagiosApps (
@@ -188,7 +177,6 @@ BEGIN
         --Issue key from Jira. Need to store it to be able to update issues in Jira from within Monarch
         --Different from incidentId as that attribute is used to store the internal Monarch incident ID
         issueKey VARCHAR(100) NOT NULL,
-        teamId INT NOT NULL,
         openTime DATETIME NOT NULL,
         closeTime DATETIME,
         summary VARCHAR(255),
@@ -213,39 +201,6 @@ GO
 
 USE monarch;
 
-IF OBJECT_ID('users', 'U') IS NULL
-BEGIN
-    CREATE TABLE users (
-        userId INT PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        email VARCHAR(100) NOT NULL UNIQUE,
-        role VARCHAR(100) NOT NULL,
-        profilePicture VARCHAR(255)
-    );
-END
-GO
-
-IF OBJECT_ID('teams', 'U') IS NULL
-BEGIN
-    CREATE TABLE teams (
-        teamId INT PRIMARY KEY,
-        teamName VARCHAR(100) NOT NULL,
-        slackChannel VARCHAR(255),
-        jiraBoard VARCHAR(255),
-        smtpGroup VARCHAR(100)
-    );
-END
-GO
-
-IF OBJECT_ID('userTeams', 'U') IS NULL
-BEGIN
-    CREATE TABLE userTeams (
-        userId INT NOT NULL,
-        teamId INT NOT NULL
-    );
-END
-GO
-
 IF OBJECT_ID('apps', 'U') IS NULL
 BEGIN
     CREATE TABLE apps (
@@ -269,15 +224,6 @@ BEGIN
         appId INT NOT NULL,
         openTime DATETIME NOT NULL,
         closeTime DATETIME
-    );
-END
-GO
-
-IF OBJECT_ID('appTeams', 'U') IS NULL
-BEGIN
-    CREATE TABLE appTeams (
-        teamId INT NOT NULL,
-        appId INT NOT NULL
     );
 END
 GO
@@ -327,5 +273,55 @@ BEGIN
         workspaceKey VARCHAR(100) NOT NULL,
         PRIMARY KEY (appId, workspaceKey)
     );
+END
+GO
+
+-- Add monarch foreign key constraints
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_incidents_apps')
+BEGIN
+    ALTER TABLE incidents
+        ADD CONSTRAINT FK_incidents_apps
+        FOREIGN KEY (appId) REFERENCES apps(appId);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_appFilters_filters')
+BEGIN
+    ALTER TABLE appFilters
+        ADD CONSTRAINT FK_appFilters_filters
+        FOREIGN KEY (filterId) REFERENCES filters(filterId);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_appFilters_apps')
+BEGIN
+    ALTER TABLE appFilters
+        ADD CONSTRAINT FK_appFilters_apps
+        FOREIGN KEY (appId) REFERENCES apps(appId);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_appSlackChannels_apps')
+BEGIN
+    ALTER TABLE appSlackChannels
+        ADD CONSTRAINT FK_appSlackChannels_apps
+        FOREIGN KEY (appId) REFERENCES apps(appId);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_appJiraWorkspaces_apps')
+BEGIN
+    ALTER TABLE appJiraWorkspaces
+        ADD CONSTRAINT FK_appJiraWorkspaces_apps
+        FOREIGN KEY (appId) REFERENCES apps(appId);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_appJiraWorkspaces_jiraWorkspaces')
+BEGIN
+    ALTER TABLE appJiraWorkspaces
+        ADD CONSTRAINT FK_appJiraWorkspaces_jiraWorkspaces
+        FOREIGN KEY (workspaceKey) REFERENCES jiraWorkspaces(workspaceKey);
 END
 GO
