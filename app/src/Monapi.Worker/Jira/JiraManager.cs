@@ -91,7 +91,7 @@ public class JiraManager
     {
         try
         {
-            using (var connection = new SqlConnection(_monarchConnStr))
+            using (var connection = new SqlConnection(_monapiConnStr))
             {
                 await connection.OpenAsync();
                 
@@ -131,7 +131,7 @@ public class JiraManager
                 return;
             }
 
-            using (var connection = new SqlConnection(_monarchConnStr))
+            using (var connection = new SqlConnection(_monapiConnStr))
             {
                 await connection.OpenAsync();
                 
@@ -206,7 +206,7 @@ public class JiraManager
                 return; // No open incident to close
             }
 
-            using (var connection = new SqlConnection(_monarchConnStr))
+            using (var connection = new SqlConnection(_monapiConnStr))
             {
                 await connection.OpenAsync();
                 
