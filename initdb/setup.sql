@@ -197,6 +197,17 @@ BEGIN
 END
 GO
 
+IF OBJECT_ID('incidents', 'U') IS NULL
+BEGIN
+    CREATE TABLE incidents (
+        incidentId INT IDENTITY(1,1) PRIMARY KEY,
+        appId INT NOT NULL,
+        openTime DATETIME NOT NULL,
+        closeTime DATETIME
+    );
+END
+GO
+
 -- Create monarch tables
 
 USE monarch;
@@ -213,17 +224,6 @@ BEGIN
         slackAlert BIT DEFAULT 0,
         jiraAlert BIT DEFAULT 0,
         smtpAlert BIT DEFAULT 0
-    );
-END
-GO
-
-IF OBJECT_ID('incidents', 'U') IS NULL
-BEGIN
-    CREATE TABLE incidents (
-        incidentId INT IDENTITY(1,1) PRIMARY KEY,
-        appId INT NOT NULL,
-        openTime DATETIME NOT NULL,
-        closeTime DATETIME
     );
 END
 GO
@@ -273,55 +273,5 @@ BEGIN
         workspaceKey VARCHAR(100) NOT NULL,
         PRIMARY KEY (appId, workspaceKey)
     );
-END
-GO
-
--- Add monarch foreign key constraints
-
-IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_incidents_apps')
-BEGIN
-    ALTER TABLE incidents
-        ADD CONSTRAINT FK_incidents_apps
-        FOREIGN KEY (appId) REFERENCES apps(appId);
-END
-GO
-
-IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_appFilters_filters')
-BEGIN
-    ALTER TABLE appFilters
-        ADD CONSTRAINT FK_appFilters_filters
-        FOREIGN KEY (filterId) REFERENCES filters(filterId);
-END
-GO
-
-IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_appFilters_apps')
-BEGIN
-    ALTER TABLE appFilters
-        ADD CONSTRAINT FK_appFilters_apps
-        FOREIGN KEY (appId) REFERENCES apps(appId);
-END
-GO
-
-IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_appSlackChannels_apps')
-BEGIN
-    ALTER TABLE appSlackChannels
-        ADD CONSTRAINT FK_appSlackChannels_apps
-        FOREIGN KEY (appId) REFERENCES apps(appId);
-END
-GO
-
-IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_appJiraWorkspaces_apps')
-BEGIN
-    ALTER TABLE appJiraWorkspaces
-        ADD CONSTRAINT FK_appJiraWorkspaces_apps
-        FOREIGN KEY (appId) REFERENCES apps(appId);
-END
-GO
-
-IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_appJiraWorkspaces_jiraWorkspaces')
-BEGIN
-    ALTER TABLE appJiraWorkspaces
-        ADD CONSTRAINT FK_appJiraWorkspaces_jiraWorkspaces
-        FOREIGN KEY (workspaceKey) REFERENCES jiraWorkspaces(workspaceKey);
 END
 GO
