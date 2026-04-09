@@ -70,7 +70,7 @@ public class NewRelicConnector
         {
             actor {
                 account(id: " + accountId + @") {
-                    nrql(query: ""SELECT latest(hostObjectId) as id, latest(ipAddress) as ip, latest(currentState) as state, latest(latency) as lat, latest(cpuUsage) as cpu, latest(throughput) as tput, latest(output) as msg, latest(statusUpdateTime) as updated FROM Metric FACET hostName LIMIT MAX SINCE 5 minutes ago"") {
+                    nrql(query: ""SELECT latest(hostObjectId) as id, latest(ipAddress) as ip, latest(currentState) as state, latest(latency) as lat, latest(cpuUsage) as cpu, latest(throughput) as tput, latest(output) as msg, latest(statusUpdateTime) as updated FROM Metric FACET hostName LIMIT MAX SINCE 15 minutes ago"") {
                         results
                     }
                 }

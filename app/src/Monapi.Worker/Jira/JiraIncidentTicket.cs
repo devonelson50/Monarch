@@ -12,10 +12,28 @@ public static class JiraIncidentTicket
     /// <summary>
     /// Creates an incident ticket payload for application status degradation.
     /// </summary>
-    public static object Create(string projectKey, string appName, string status, string priority = "Medium")
+    public static object Create(string projectKey, string appName, string status, string issueTypeId, string priority = "Medium", string metricDetails = "")
     {
         var statusIcon = StatusIcon(status);
         var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+
+        var contentBlocks = new List<JiraContentBlock>
+        {
+            JiraDoc.Heading("Incident Details"),
+            JiraDoc.LabeledField("Application", appName),
+            JiraDoc.LabeledField("Status", $"{statusIcon} {status}"),
+            JiraDoc.LabeledField("Detected", $"{timestamp} UTC")
+        };
+
+        if (!string.IsNullOrEmpty(metricDetails))
+        {
+            contentBlocks.Add(JiraDoc.Heading("Out-of-Range Metrics"));
+            contentBlocks.Add(JiraDoc.Paragraph(metricDetails));
+        }
+
+        contentBlocks.Add(JiraDoc.Heading("Description"));
+        contentBlocks.Add(JiraDoc.Paragraph($"This incident was automatically created by Monarch monitoring system. The application '{appName}' has entered a {status.ToLower()} state and requires investigation."));
+        contentBlocks.Add(JiraDoc.Paragraph("Please check the application logs, infrastructure metrics, and dependencies to identify the root cause.", italic: true));
 
         return new JiraIssuePayload
         {
@@ -23,16 +41,8 @@ public static class JiraIncidentTicket
             {
                 Project = new JiraKeyRef { Key = projectKey },
                 Summary = $"{statusIcon} {appName} - Status: {status}",
-                Description = JiraDoc.Build(
-                    JiraDoc.Heading("Incident Details"),
-                    JiraDoc.LabeledField("Application", appName),
-                    JiraDoc.LabeledField("Status", $"{statusIcon} {status}"),
-                    JiraDoc.LabeledField("Detected", $"{timestamp} UTC"),
-                    JiraDoc.Heading("Description"),
-                    JiraDoc.Paragraph($"This incident was automatically created by Monarch monitoring system. The application '{appName}' has entered a {status.ToLower()} state and requires investigation."),
-                    JiraDoc.Paragraph("Please check the application logs, infrastructure metrics, and dependencies to identify the root cause.", italic: true)
-                ),
-                IssueType = new JiraNameRef { Name = "Incident" },
+                Description = JiraDoc.Build(contentBlocks.ToArray()),
+                IssueType = new JiraIdRef { Id = issueTypeId },
                 Priority = new JiraNameRef { Name = priority },
                 Labels = new[] { "monarch-incident", "automated", $"status-{status.ToLower()}" }
             }
@@ -100,7 +110,7 @@ public class JiraFields
     public JiraDocument Description { get; set; } = new();
 
     [JsonPropertyName("issuetype")]
-    public JiraNameRef IssueType { get; set; } = new();
+    public JiraIdRef IssueType { get; set; } = new();
 
     [JsonPropertyName("priority")]
     public JiraNameRef Priority { get; set; } = new();
@@ -113,6 +123,12 @@ public class JiraKeyRef
 {
     [JsonPropertyName("key")]
     public string Key { get; set; } = string.Empty;
+}
+
+public class JiraIdRef
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
 }
 
 public class JiraNameRef

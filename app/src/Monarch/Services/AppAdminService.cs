@@ -36,6 +36,10 @@ namespace Monarch.Services
         /// </summary>
         public async Task UpdateAppAsync(AppModel app)
         {
+            // Sync alert flags with actual workspace/channel selections before saving
+            app.JiraAlert = app.SelectedJiraWorkspaces.Any();
+            app.SlackAlert = app.SelectedSlackChannels.Any();
+
             using (var connection = new SqlConnection(_monarchConnectionString))
             {
                 await connection.OpenAsync();

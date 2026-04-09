@@ -47,7 +47,7 @@
     </div>
 </nav>
 
-<AddApplication IsVisible="showAddApp" OnClose="ToggleAddApp" />
+<AddApplication IsVisible="showAddApp" OnClose="ToggleAddApp" OnApplicationAdded="OnApplicationAdded" />
 
 <style>
     .navbar {
@@ -155,6 +155,8 @@
 @code {
     
     // Admin console now lives at /admin route — no code-behind needed here.
+
+    [Parameter] public EventCallback OnApplicationAdded { get; set; }
 
     // Switch to show/hide Add Application modal
     private bool showAddApp = false;

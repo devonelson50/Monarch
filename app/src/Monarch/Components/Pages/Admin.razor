@@ -14,10 +14,9 @@ Monarch Admin Page
 @using Monarch.Services
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "Admin")]
-@inject AppAdminService AppService
+@inject AppAdminService AdminService
 @inject SlackAdminService SlackService
 @inject AppLoadService LoadService
-@inject AppCreationService CreationService
 
 @rendermode InteractiveServer
 
@@ -47,21 +46,8 @@ Monarch Admin Page
                         }
                     </select>
 
-                    @if (!showCreateForm)
-                    {
-                        <button class="btn-secondary" @onclick="ShowCreateForm">+ New App</button>
-                    }
                 </div>
             </div>
-
-            @if (showCreateForm)
-            {
-                <div class="create-app-row">
-                    <input type="text" @bind="newAppName" placeholder="Enter new application name" />
-                    <button class="btn-primary" @onclick="CreateNewApp">Create</button>
-                    <button class="btn-secondary" @onclick="CancelCreate">Cancel</button>
-                </div>
-            }
         </div>
     </div>
 
@@ -339,9 +325,6 @@ Monarch Admin Page
     // Form state
     private int selectedAppId = 0;
     private AppModel? currentApp;
-    private bool isNewApp = false;
-    private bool showCreateForm = false;
-    private string newAppName = "";
     private string filterSearchText = "";
     private List<int> activeAppFilterIds = new();
     private JiraWorkspaceOption newJiraWorkspace = new();
@@ -392,7 +375,6 @@ Monarch Admin Page
     private async Task OnAppSelected()
     {
         saveStatus = "";
-        isNewApp = false;
         activeAppFilterIds.Clear();
         if (selectedAppId > 0)
         {
@@ -402,49 +384,6 @@ Monarch Admin Page
         {
             currentApp = null;
         }
-    }
-
-    // ===== Create New App =====
-
-    private void ShowCreateForm()
-    {
-        showCreateForm = true;
-        newAppName = "";
-    }
-
-    private void CancelCreate()
-    {
-        showCreateForm = false;
-        newAppName = "";
-    }
-
-    private void CreateNewApp()
-    {
-        if (string.IsNullOrWhiteSpace(newAppName))
-            return;
-
-        // Prepare a temporary MonarchApp object - don't save to DB yet
-        currentApp = new AppModel
-        {
-            AppId = 0, // Will be assigned after save
-            AppName = newAppName.Trim(),
-            Status = (StatusType)3,
-            NewRelicId = null,
-            NagiosId = null,
-            SlackAlert = false,
-            JiraAlert = false,
-            SmtpAlert = false,
-            Filters = new List<FilterModel>(),
-            SelectedSlackChannels = new List<string>(),
-            SelectedJiraWorkspaces = new List<string>()
-        };
-        activeAppFilterIds.Clear();
-        isNewApp = true;
-        showCreateForm = false;
-        selectedAppId = 0;
-        newAppName = "";
-        saveStatus = "Configure the new application and click 'Save Changes' at the bottom to create it.";
-        saveStatusClass = "status-message status-info";
     }
 
     // ===== Multi-Select Toggles =====
@@ -507,6 +446,8 @@ Monarch Admin Page
         {
             currentApp.SelectedSlackChannels.Remove(channelKey);
         }
+
+        currentApp.SlackAlert = currentApp.SelectedSlackChannels.Any();
     }
 
     private void ToggleJiraWorkspace(string workspaceKey, bool isChecked)
@@ -521,6 +462,8 @@ Monarch Admin Page
         {
             currentApp.SelectedJiraWorkspaces.Remove(workspaceKey);
         }
+
+        currentApp.JiraAlert = currentApp.SelectedJiraWorkspaces.Any();
     }
 
     // ===== Add Jira Workspace =====
@@ -555,14 +498,6 @@ Monarch Admin Page
 
         try
         {
-            if (isNewApp)
-            {
-                // Create the app in database first
-                var newId = await CreationService.CreateMonarchAppAsync(currentApp);
-                currentApp.AppId = newId;
-                isNewApp = false;
-            }
-
             // Track which Slack channels are newly added
             var previousChannels = new List<string>();
             if (currentApp.AppId > 0)
@@ -613,9 +548,7 @@ Monarch Admin Page
     {
         currentApp = null;
         selectedAppId = 0;
-        isNewApp = false;
         saveStatus = "";
-        showCreateForm = false;
         testTicketStatus = "";
     }
 

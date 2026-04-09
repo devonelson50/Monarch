@@ -7,80 +7,91 @@ namespace Monapi.Worker.Jira;
 
 public class JiraManager
 {
-    private readonly JiraConnector _connector;
-    private readonly string _sqlPassword;
+    private readonly string _jiraApiKey;
+    private readonly string _monarchConnStr;
+    private readonly string _monapiConnStr;
 
-    public JiraManager(JiraConnector connector, string sqlPassword)
+    public JiraManager(string jiraApiKey, string monarchConnStr, string monapiConnStr)
     {
-        _connector = connector;
-        _sqlPassword = sqlPassword;
+        _jiraApiKey = jiraApiKey;
+        _monarchConnStr = monarchConnStr;
+        _monapiConnStr = monapiConnStr;
     }
 
 
-    // Handles application status change and creates Jira ticket if needed
+    // Creates or updates a Jira ticket when an app's status worsens.
+    // The caller (Worker) is responsible for checking whether the status is actually worsening
+    // before calling this method.
 
-    public async Task HandleStatusChange(string appId, string appName, string oldStatus, string newStatus, bool shouldCreateTicket)
+    public async Task HandleStatusChange(int appId, string appName, string newStatus, string metricDetails = "")
     {
-        if (!shouldCreateTicket)
-        {
-            return;
-        }
-
-        // Only create tickets for degraded or down statuses
-        if (newStatus == "Operational")
-        {
-            // If recovering, check if there's an open incident and close it
-            await HandleRecovery(appId, appName);
-            return;
-        }
-
-        // Check if status is worse (Operational → Degraded/Down or Degraded → Down)
-        bool isWorsening = IsStatusWorsening(oldStatus, newStatus);
-        
-        if (!isWorsening)
-        {
-            return; // Don't create duplicate tickets for same or improving status
-        }
-
         // Check if there's already an open incident for this app
         var existingIncidentId = await GetOpenIncidentId(appId);
-        
+
+        // Look up the Jira workspace configured for this app
+        var workspace = await GetWorkspaceForApp(appId);
+        if (workspace == null)
+        {
+            Console.WriteLine($"No Jira workspace configured for app {appName} (id: {appId}). Skipping ticket creation.");
+            return;
+        }
+
+        var connector = new JiraConnector(workspace.Value.BaseUrl, workspace.Value.WorkspaceKey, _jiraApiKey);
+
         if (existingIncidentId.HasValue)
         {
             // Update existing ticket with new status
-            await UpdateExistingIncident(existingIncidentId.Value, appName, newStatus);
+            await UpdateExistingIncident(existingIncidentId.Value, appName, newStatus, connector);
         }
         else
         {
             // Create new incident and Jira ticket
-            await CreateNewIncident(appId, appName, newStatus);
+            await CreateNewIncident(appId, appName, newStatus, connector, metricDetails);
         }
     }
 
-    // Determines if the status change represents worsening conditions
-    private bool IsStatusWorsening(string oldStatus, string newStatus)
-    {
-        var statusPriority = new Dictionary<string, int>
-        {
-            { "Operational", 0 },
-            { "Degraded", 1 },
-            { "Down", 2 }
-        };
-
-        int oldPriority = statusPriority.GetValueOrDefault(oldStatus, 0);
-        int newPriority = statusPriority.GetValueOrDefault(newStatus, 0);
-
-        return newPriority > oldPriority;
-    }
-
-    // Gets the open incident ID for an application, if one exists
-    private async Task<int?> GetOpenIncidentId(string appId)
+    // Looks up the Jira workspace configured for an app
+    private async Task<(string WorkspaceKey, string BaseUrl)?> GetWorkspaceForApp(int appId)
     {
         try
         {
-            var connectionString = $"Server=sqlserver,1433;Database=monarch;User Id=monapi;Password={_sqlPassword};TrustServerCertificate=False;";
-            
-            using (var connection = new SqlConnection(connectionString))
+            using (var connection = new SqlConnection(_monarchConnStr))
+            {
+                await connection.OpenAsync();
+                
+                var query = @"
+                    SELECT TOP 1 jw.workspaceKey, jw.baseUrl 
+                    FROM appJiraWorkspaces ajw 
+                    INNER JOIN jiraWorkspaces jw ON ajw.workspaceKey = jw.workspaceKey 
+                    WHERE ajw.appId = @appId";
+                
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@appId", appId);
+                    
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            return (reader.GetString(0), reader.GetString(1));
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error looking up Jira workspace for app {appId}: {ex.Message}");
+        }
+        return null;
+    }
+
+    // Gets the open incident ID for an application, if one exists
+    private async Task<int?> GetOpenIncidentId(int appId)
+    {
+        try
+        {
+            using (var connection = new SqlConnection(_monapiConnStr))
             {
                 await connection.OpenAsync();
                 
@@ -108,13 +119,19 @@ public class JiraManager
     }
 
     // Creates a new incident record and associated Jira ticket
-    private async Task CreateNewIncident(string appId, string appName, string status)
+    private async Task CreateNewIncident(int appId, string appName, string status, JiraConnector connector, string metricDetails = "")
     {
         try
         {
-            var connectionString = $"Server=sqlserver,1433;Database=monarch;User Id=monapi;Password={_sqlPassword};TrustServerCertificate=False;";
-            
-            using (var connection = new SqlConnection(connectionString))
+            // Resolve issue type ID dynamically from the Jira project
+            var issueTypeId = await connector.ResolveIssueTypeId();
+            if (issueTypeId == null)
+            {
+                Console.WriteLine($"Failed to resolve issue type for app {appName}. Cannot create Jira ticket.");
+                return;
+            }
+
+            using (var connection = new SqlConnection(_monapiConnStr))
             {
                 await connection.OpenAsync();
                 
@@ -137,7 +154,7 @@ public class JiraManager
 
                 // Create Jira ticket using template
                 var priority = status == "Down" ? "High" : "Medium";
-                var ticket = await _connector.CreateIncidentIssue(appName, status, priority);
+                var ticket = await connector.CreateIncidentIssue(appName, status, issueTypeId, priority, metricDetails);
 
                 if (ticket != null)
                 {
@@ -155,7 +172,7 @@ public class JiraManager
     }
 
     // Updates an existing incident with additional information
-    private async Task UpdateExistingIncident(int incidentId, string appName, string newStatus)
+    private async Task UpdateExistingIncident(int incidentId, string appName, string newStatus, JiraConnector connector)
     {
         try
         {
@@ -166,7 +183,7 @@ public class JiraManager
             {
                 // Use template for update comment (pass empty string as oldStatus since we don't track it here)
                 var comment = JiraIncidentTicket.CreateUpdateComment(appName, newStatus, "Previous");
-                await _connector.AddComment(jiraKey, comment);
+                await connector.AddComment(jiraKey, comment);
                 
                 Console.WriteLine($"Updated Jira ticket {jiraKey} for incident {incidentId}");
             }
@@ -178,7 +195,7 @@ public class JiraManager
     }
 
     // Handles application recovery by closing open incidents
-    private async Task HandleRecovery(string appId, string appName)
+    public async Task HandleRecovery(int appId, string appName)
     {
         try
         {
@@ -189,9 +206,7 @@ public class JiraManager
                 return; // No open incident to close
             }
 
-            var connectionString = $"Server=sqlserver,1433;Database=monarch;User Id=monapi;Password={_sqlPassword};TrustServerCertificate=False;";
-            
-            using (var connection = new SqlConnection(connectionString))
+            using (var connection = new SqlConnection(_monapiConnStr))
             {
                 await connection.OpenAsync();
                 
@@ -213,10 +228,15 @@ public class JiraManager
                 
                 if (jiraKey != null)
                 {
-                    var comment = JiraIncidentTicket.CreateRecoveryComment(appName);
-                    await _connector.AddComment(jiraKey, comment);
-                    
-                    Console.WriteLine($"Added recovery comment to Jira ticket {jiraKey}");
+                    var workspace = await GetWorkspaceForApp(appId);
+                    if (workspace != null)
+                    {
+                        var connector = new JiraConnector(workspace.Value.BaseUrl, workspace.Value.WorkspaceKey, _jiraApiKey);
+                        var comment = JiraIncidentTicket.CreateRecoveryComment(appName);
+                        await connector.AddComment(jiraKey, comment);
+                        
+                        Console.WriteLine($"Added recovery comment to Jira ticket {jiraKey}");
+                    }
                 }
             }
         }
@@ -231,22 +251,19 @@ public class JiraManager
     {
         try
         {
-            var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={_sqlPassword};TrustServerCertificate=False;";
-            
-            using (var connection = new SqlConnection(connectionString))
+            using (var connection = new SqlConnection(_monapiConnStr))
             {
                 await connection.OpenAsync();
                 
                 var query = @"
-                    INSERT INTO jira (ticketId, incidentId, teamId, issueKey, openTime, summary, description) 
-                    VALUES (@ticketId, @incidentId, @teamId, @issueKey, @openTime, @summary, @description)";
+                    INSERT INTO jira (ticketId, incidentId, issueKey, openTime, summary, description) 
+                    VALUES (@ticketId, @incidentId, @issueKey, @openTime, @summary, @description)";
                 
                 using (var command = new SqlCommand(query, connection))
                 {
                     // Use a hash of the issue key as the ticketId
                     command.Parameters.AddWithValue("@ticketId", Math.Abs(ticket.IssueKey.GetHashCode()));
                     command.Parameters.AddWithValue("@incidentId", incidentId);
-                    command.Parameters.AddWithValue("@teamId", 1); // Default team, can be enhanced later
                     command.Parameters.AddWithValue("@issueKey", ticket.IssueKey);
                     command.Parameters.AddWithValue("@openTime", ticket.CreatedAt);
                     command.Parameters.AddWithValue("@summary", ticket.Summary);
@@ -267,9 +284,7 @@ public class JiraManager
     {
         try
         {
-            var connectionString = $"Server=sqlserver,1433;Database=monapi;User Id=monapi;Password={_sqlPassword};TrustServerCertificate=False;";
-            
-            using (var connection = new SqlConnection(connectionString))
+            using (var connection = new SqlConnection(_monapiConnStr))
             {
                 await connection.OpenAsync();
                 
