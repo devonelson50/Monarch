@@ -9,15 +9,17 @@ Monarch Admin Page
 *@
 
 @page "/admin"
+@using Microsoft.AspNetCore.Authentication.OAuth.Claims
+@using Microsoft.Identity.Client
 @using Monarch.Components
 @using Monarch.Models
 @using Monarch.Services
 @using Microsoft.AspNetCore.Authorization
+@using System.Runtime.CompilerServices
 @attribute [Authorize(Policy = "Admin")]
-@inject AppAdminService AppService
+@inject AppAdminService AdminService
 @inject SlackAdminService SlackService
 @inject AppLoadService LoadService
-@inject AppCreationService CreationService
 
 @rendermode InteractiveServer
 
@@ -47,21 +49,8 @@ Monarch Admin Page
                         }
                     </select>
 
-                    @if (!showCreateForm)
-                    {
-                        <button class="btn-secondary" @onclick="ShowCreateForm">+ New App</button>
-                    }
                 </div>
             </div>
-
-            @if (showCreateForm)
-            {
-                <div class="create-app-row">
-                    <input type="text" @bind="newAppName" placeholder="Enter new application name" />
-                    <button class="btn-primary" @onclick="CreateNewApp">Create</button>
-                    <button class="btn-secondary" @onclick="CancelCreate">Cancel</button>
-                </div>
-            }
         </div>
     </div>
 
@@ -129,17 +118,25 @@ Monarch Admin Page
                         }
                     </div>
 
-                    <div class="dropdown-options-list shadow">
+                    <div class="checkbox-list">
                         @if (FilteredFilters.Any())
                         {
                             @foreach (var filter in FilteredFilters)
                             {
                                 var isChecked = activeAppFilterIds.Contains(filter.FilterId);
-                                <label class="dropdown-checkbox-item">
-                                    <input type="checkbox" checked="@isChecked" 
-                                           @onchange="(e) => ToggleFilter(filter.FilterId, (bool)(e.Value ?? false))" />
-                                    <span>@filter.FilterName</span>
-                                </label>
+                                <div class="filter-row">
+                                    <label class="filter-label">
+                                        <input type="checkbox" checked="@isChecked" 
+                                            @onchange="(e) => ToggleFilter(filter.FilterId, (bool)(e.Value ?? false))" />
+                                        <span class="checkbox-label-text">
+                                            @filter.FilterName
+                                        </span>
+                                    </label>
+                                    
+                                    <div class="filter-actions">
+                                        <button class="btn-mini" @onclick="() => PromptDelete(DeleteTarget.Filter, filter.FilterId, filter.FilterName)">Delete</button>
+                                    </div>
+                                </div>
                             }
                         }
                         else if (string.IsNullOrWhiteSpace(filterSearchText))
@@ -313,8 +310,12 @@ Monarch Admin Page
                 </div>
 
                 <div class="save-actions">
-                    <button class="btn-primary btn-large" @onclick="SaveConfiguration">Save Changes</button>
-                    <button class="btn-secondary" @onclick="ResetForm">Discard</button>
+                    <div class="action-group-left">
+                        <button class="btn-primary btn-large" @onclick="SaveConfiguration">Save Changes</button>
+                        <button class="btn-secondary" @onclick="ResetForm">Discard</button>
+                    </div>
+
+                    <button class="btn-delete btn-large" @onclick="() => PromptDelete(DeleteTarget.App, currentApp.AppId, currentApp.AppName)">Delete Configuration</button>
                 </div>
 
                 @if (!string.IsNullOrEmpty(saveStatus))
@@ -325,6 +326,32 @@ Monarch Admin Page
         </div>
     }
 </div>
+@if (showDeleteConfirmation)
+{
+    <div class="modal-backdrop">
+        <div class="custom-modal shadow">
+            <h3>Confirm Deletion</h3>
+            @if(currentDeleteTarget == DeleteTarget.App)
+            {
+                <p>Are you sure you want to delete this configuration for <strong>@itemToDeleteName</strong>? This action cannot be undone.</p>
+
+                <div class="modal-validation-group">
+                    <label>Please type <strong>@itemToDeleteName</strong> to confirm:</label>
+                    <input type="text" @bind="confirmNameInput" @bind:event="oninput" autocomplete="off" placeholder="Type name here..." />
+                </div>
+            } 
+            else
+            {
+                <p>Are you sure you want to delete the filter <strong>@itemToDeleteName</strong>? This action cannot be undone.</p>
+            }
+
+            <div class="modal-actions">
+                <button class="btn-secondary" @onclick="CancelDelete">Cancel</button>
+                <button class="btn-delete" @onclick="ConfirmDelete" disabled="@IsDeleteDisabled">Delete</button>
+            </div>
+        </div>
+    </div>
+}
 
 @code {
     // Data collections
@@ -339,12 +366,21 @@ Monarch Admin Page
     // Form state
     private int selectedAppId = 0;
     private AppModel? currentApp;
-    private bool isNewApp = false;
-    private bool showCreateForm = false;
-    private string newAppName = "";
     private string filterSearchText = "";
     private List<int> activeAppFilterIds = new();
     private JiraWorkspaceOption newJiraWorkspace = new();
+
+    //For Deletion Purposes
+    private enum DeleteTarget
+    {
+        App,
+        Filter
+    }
+    private bool showDeleteConfirmation = false;
+    private DeleteTarget currentDeleteTarget;
+    private int itemToDeleteId;
+    private string itemToDeleteName = "";
+    private string confirmNameInput = "";
 
     // This dynamically filters the list based on what is typed in the search box
     private IEnumerable<FilterModel> FilteredFilters =>
@@ -392,7 +428,6 @@ Monarch Admin Page
     private async Task OnAppSelected()
     {
         saveStatus = "";
-        isNewApp = false;
         activeAppFilterIds.Clear();
         if (selectedAppId > 0)
         {
@@ -404,48 +439,34 @@ Monarch Admin Page
         }
     }
 
-    // ===== Create New App =====
-
-    private void ShowCreateForm()
-    {
-        showCreateForm = true;
-        newAppName = "";
+    private void PromptDelete(DeleteTarget target, int id, string name){
+        currentDeleteTarget = target;
+        itemToDeleteId = id;
+        itemToDeleteName = name;
+        confirmNameInput = "";
+        showDeleteConfirmation = true;
     }
 
-    private void CancelCreate()
+    private void CancelDelete()
     {
-        showCreateForm = false;
-        newAppName = "";
+        showDeleteConfirmation = false;
     }
 
-    private void CreateNewApp()
+    private async Task ConfirmDelete()
     {
-        if (string.IsNullOrWhiteSpace(newAppName))
-            return;
+        showDeleteConfirmation = false;
 
-        // Prepare a temporary MonarchApp object - don't save to DB yet
-        currentApp = new AppModel
+        if (currentDeleteTarget == DeleteTarget.App)
         {
-            AppId = 0, // Will be assigned after save
-            AppName = newAppName.Trim(),
-            Status = (StatusType)3,
-            NewRelicId = null,
-            NagiosId = null,
-            SlackAlert = false,
-            JiraAlert = false,
-            SmtpAlert = false,
-            Filters = new List<FilterModel>(),
-            SelectedSlackChannels = new List<string>(),
-            SelectedJiraWorkspaces = new List<string>()
-        };
-        activeAppFilterIds.Clear();
-        isNewApp = true;
-        showCreateForm = false;
-        selectedAppId = 0;
-        newAppName = "";
-        saveStatus = "Configure the new application and click 'Save Changes' at the bottom to create it.";
-        saveStatusClass = "status-message status-info";
+            await DeleteConfiguration(itemToDeleteId);
+        } else {
+            await DeleteFilter(itemToDeleteId);
+        }
     }
+
+    private bool IsDeleteDisabled =>
+        currentDeleteTarget == DeleteTarget.App &&
+        !string.Equals(confirmNameInput, itemToDeleteName, StringComparison.OrdinalIgnoreCase);
 
     // ===== Multi-Select Toggles =====
 
@@ -495,6 +516,23 @@ Monarch Admin Page
         }
     }
 
+    private async Task DeleteFilter(int filterId)
+    {
+        try
+        {
+            await AdminService.DeleteFilterAsync(filterId);
+
+            StateHasChanged();
+
+            await LoadAllData();
+        }
+        catch (Exception ex)
+        {
+            saveStatus = $"Error deleting filter: {ex.Message}";
+            saveStatusClass = "status-message status-error";
+        }
+    }
+
     private void ToggleSlackChannel(string channelKey, bool isChecked)
     {
         if (currentApp == null) return;
@@ -507,6 +545,8 @@ Monarch Admin Page
         {
             currentApp.SelectedSlackChannels.Remove(channelKey);
         }
+
+        currentApp.SlackAlert = currentApp.SelectedSlackChannels.Any();
     }
 
     private void ToggleJiraWorkspace(string workspaceKey, bool isChecked)
@@ -521,6 +561,8 @@ Monarch Admin Page
         {
             currentApp.SelectedJiraWorkspaces.Remove(workspaceKey);
         }
+
+        currentApp.JiraAlert = currentApp.SelectedJiraWorkspaces.Any();
     }
 
     // ===== Add Jira Workspace =====
@@ -555,14 +597,6 @@ Monarch Admin Page
 
         try
         {
-            if (isNewApp)
-            {
-                // Create the app in database first
-                var newId = await CreationService.CreateMonarchAppAsync(currentApp);
-                currentApp.AppId = newId;
-                isNewApp = false;
-            }
-
             // Track which Slack channels are newly added
             var previousChannels = new List<string>();
             if (currentApp.AppId > 0)
@@ -613,10 +647,33 @@ Monarch Admin Page
     {
         currentApp = null;
         selectedAppId = 0;
-        isNewApp = false;
         saveStatus = "";
-        showCreateForm = false;
         testTicketStatus = "";
+    }
+
+    private async Task DeleteConfiguration(int id)
+    {
+        if(currentApp == null) return;
+
+        try
+        {
+            var deletedAppName = currentApp.AppName;
+            await AdminService.DeleteAppAsync(id);
+            saveStatus = $"Configuration for '{deletedAppName}' deleted successfully. Changes will be reflected on the dashboard.";
+            saveStatusClass = "status-message status-success";
+
+            StateHasChanged();
+
+            await Task.Delay(3000);
+            await LoadAllData();
+            currentApp = null;
+            selectedAppId = 0;
+        }
+        catch (Exception ex)
+        {
+            saveStatus = $"Error deleting configuration: {ex.Message}";
+            saveStatusClass = "status-message status-error";
+        }
     }
 
     // ===== Send Test Jira Ticket =====
@@ -871,18 +928,59 @@ Monarch Admin Page
         min-width: 140px;
     }
 
+    .search-box input{
+        padding: 8px 10px;
+        margin-bottom: 8px;
+        border: 1px solid #555;
+        border-radius: 6px;
+        background-color: #363636;
+        color: #FFFFFF;
+        font-size: 13px;
+        max-width: 20em;
+        width: 100%;
+    }
+
     /* ===== Checkbox Lists ===== */
 
     .checkbox-list {
         display: flex;
+        max-height: 275px;
+        overflow-y: auto;
+        padding-right: 5px;
         flex-direction: column;
         gap: 8px;
         margin-bottom: 16px;
     }
 
+    /*Done specifically for firefox*/
+    @@-moz-document url-prefix() {
+        .checkbox-list {
+            scrollbar-width: thin;
+            scrollbar-color: #555 transparent;
+        }
+    }
+
+    .checkbox-list::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .checkbox-list::-webkit-scrollbar-track {
+        background: transparent; 
+        border-radius: 4px;
+    }
+
+    .checkbox-list::-webkit-scrollbar-thumb {
+        background: #555; 
+        border-radius: 4px;
+    }
+
+    .checkbox-list::-webkit-scrollbar-thumb:hover {
+        background: #777; 
+    }
+
     .checkbox-item {
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         gap: 10px;
         padding: 10px 14px;
         background-color: #363636;
@@ -936,6 +1034,52 @@ Monarch Admin Page
 
     .toggle-label input[type="checkbox"] {
         accent-color: #0078D4;
+    }
+
+    .filter-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background-color: #363636;
+        border: 1px solid #4A4A4A;
+        border-radius: 6px;
+        transition: border-color 0.2s;
+    }
+
+    .filter-row:hover {
+        border-color: #0078D4;
+    }
+
+    .filter-label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        flex: 1;
+        cursor: pointer;
+        font-size: 16px;
+    }
+
+    .filter-actions {
+        display: flex;
+        gap: 6px;
+        padding-right: 14px; 
+    }
+
+    .btn-mini {
+        background-color: #4D4D4D;
+        color: #CCCCCC;
+        border: none;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s, color 0.2s;
+    }
+
+    .btn-mini:hover {
+        background-color: #D32F2F;
+        color: #FFFFFF;
     }
 
     /* ===== Review Summary ===== */
@@ -1034,7 +1178,42 @@ Monarch Admin Page
         cursor: not-allowed;
     }
 
+    .btn-delete {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px; 
+        padding: 10px 20px;
+        background-color: #D32F2F;
+        border: none;
+        color: #FFFFFF;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background-color 0.2s;
+    }
+
+    .btn-delete:hover {
+        background-color: #B32424;
+    }
+    
+    /* Removed the :active state to match the static click feel of your other buttons */
+
+    /* Optional: If you already have a .btn-large class doing this, you can skip this part */
+    .btn-large {
+        padding: 12px 24px;
+        font-size: 16px;
+    }
+
     .save-actions {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 24px;
+    }
+
+    .action-group-left{
         display: flex;
         gap: 12px;
         align-items: center;
@@ -1075,5 +1254,96 @@ Monarch Admin Page
         background-color: #2D4A5A;
         color: #90C8EE;
         border: 1px solid #3D6A7A;
+    }
+
+    /*Deletion Confirmation Styles*/
+    .modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.6); /* Semi-transparent black */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000; /* Ensures it sits on top of absolutely everything */
+    }
+
+    /* The popup box itself */
+    .custom-modal {
+        background-color: #2D2D2D; /* Matches your admin page background */
+        border: 1px solid #4A4A4A;
+        border-radius: 8px;
+        padding: 24px;
+        width: 100%;
+        max-width: 400px;
+        color: #FFFFFF;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); /* Gives it a nice pop off the screen */
+    }
+
+    .custom-modal h3 {
+        margin-top: 0;
+        margin-bottom: 12px;
+        font-size: 20px;
+        font-weight: 500;
+    }
+
+    .custom-modal p {
+        color: #CCCCCC;
+        font-size: 14px;
+        margin-bottom: 24px;
+        line-height: 1.5;
+    }
+
+    /* Push the buttons to the right side of the modal */
+    .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+    }
+
+    .modal-validation-group {
+        margin-bottom: 24px;
+        background-color: rgba(211, 47, 47, 0.1);
+        border: 1px solid rgba(211, 47, 47, 0.3);
+        padding: 12px;
+        border-radius: 6px;
+    }
+
+    .modal-validation-group label {
+        display: block;
+        font-size: 13px;
+        color: #CCCCCC;
+        margin-bottom: 8px;
+    }
+
+    .modal-validation-group input {
+        width: 100%;
+        box-sizing: border-box; /* Ensures padding doesn't break the width */
+        padding: 10px 12px;
+        border: 1px solid #555;
+        border-radius: 4px;
+        background-color: #222222; /* Slightly darker than the modal */
+        color: #FFFFFF;
+        font-size: 14px;
+        transition: border-color 0.2s;
+    }
+
+    .modal-validation-group input:focus {
+        border-color: #D32F2F; /* Red border on focus to match the delete theme */
+        outline: none;
+    }
+
+    /* Add this to style the disabled state of your delete button */
+    .btn-delete:disabled {
+        background-color: #4D4D4D;
+        color: #888888;
+        cursor: not-allowed;
+        opacity: 0.7;
+    }
+
+    .btn-delete:disabled:hover {
+        background-color: #4D4D4D; /* Prevent hover effect when disabled */
     }
 </style>

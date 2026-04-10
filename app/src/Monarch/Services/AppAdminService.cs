@@ -36,6 +36,10 @@ namespace Monarch.Services
         /// </summary>
         public async Task UpdateAppAsync(AppModel app)
         {
+            // Sync alert flags with actual workspace/channel selections before saving
+            app.JiraAlert = app.SelectedJiraWorkspaces.Any();
+            app.SlackAlert = app.SelectedSlackChannels.Any();
+
             using (var connection = new SqlConnection(_monarchConnectionString))
             {
                 await connection.OpenAsync();
@@ -63,6 +67,31 @@ namespace Monarch.Services
             // Update many-to-many relationships
             await SaveAppSlackChannelsAsync(app.AppId, app.SelectedSlackChannels);
             await SaveAppJiraWorkspacesAsync(app.AppId, app.SelectedJiraWorkspaces);
+        }
+
+        /*
+        Brady Brown
+        DeleteAppAsync Method
+        Given an int, deletes the app with that int id in the apps table
+        Also deletes references to that app within database via cascade
+        */
+        public async Task DeleteAppAsync(int appId)
+        {
+            using (var conn = new SqlConnection(_monarchConnectionString))
+            {
+                await conn.OpenAsync();
+
+                //Query to input string into table
+                //Also returns created auto id
+                var sql = "DELETE FROM apps WHERE appId = @id";
+
+                using (var cmd = new SqlCommand(sql, conn))
+                {
+                    //inserts int as parameter
+                    cmd.Parameters.AddWithValue("@id", appId);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
         }
 
         /// <summary>
@@ -504,6 +533,32 @@ namespace Monarch.Services
 
                     //Convert auto id into int for better referencing and returns
                     return Convert.ToInt32(result);
+                }
+            }
+        }
+
+
+        /*
+        Brady Brown
+        DeleteFilterAsync Method
+        Given an int, deletes the filter with that int id in the filters table
+        Also deletes references to that filter within database via cascade
+        */
+        public async Task DeleteFilterAsync(int filterId)
+        {
+            using (var conn = new SqlConnection(_monarchConnectionString))
+            {
+                await conn.OpenAsync();
+
+                //Query to input string into table
+                //Also returns created auto id
+                var sql = "DELETE FROM filters WHERE filterId = @id";
+
+                using (var cmd = new SqlCommand(sql, conn))
+                {
+                    //inserts int as parameter
+                    cmd.Parameters.AddWithValue("@id", filterId);
+                    await cmd.ExecuteNonQueryAsync();
                 }
             }
         }

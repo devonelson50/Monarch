@@ -111,10 +111,13 @@ ALTER ROLE db_owner ADD MEMBER keycloak;
 GO
 
 -- monarch account needs r/w to monarch db
+-- monapi account needs read-only to monarch db
 USE monarch;
 CREATE USER monarch FOR LOGIN monarch;
+CREATE USER monapi FOR LOGIN monapi;
 ALTER ROLE db_datareader ADD MEMBER monarch;
 ALTER ROLE db_datawriter ADD MEMBER monarch;
+ALTER ROLE db_datareader ADD MEMBER monapi;
 GO
 
 -- monapi account needs r/w to monapi db
@@ -142,17 +145,6 @@ BEGIN
         statusUpdateTime DATETIME,
         lastCheck DATETIME
     );END
-GO
-
-IF OBJECT_ID('newRelicIncidents', 'U') IS NULL
-BEGIN
-    CREATE TABLE newRelicIncidents (
-        incidentId VARCHAR(100) PRIMARY KEY,
-        appId INT NOT NULL,
-        openTime DATETIME NOT NULL,
-        closeTime DATETIME
-    );
-END
 GO
 
 IF OBJECT_ID('nagiosApps', 'U') IS NULL
@@ -185,7 +177,6 @@ BEGIN
         --Issue key from Jira. Need to store it to be able to update issues in Jira from within Monarch
         --Different from incidentId as that attribute is used to store the internal Monarch incident ID
         issueKey VARCHAR(100) NOT NULL,
-        teamId INT NOT NULL,
         openTime DATETIME NOT NULL,
         closeTime DATETIME,
         summary VARCHAR(255),
@@ -206,42 +197,20 @@ BEGIN
 END
 GO
 
+IF OBJECT_ID('incidents', 'U') IS NULL
+BEGIN
+    CREATE TABLE incidents (
+        incidentId INT IDENTITY(1,1) PRIMARY KEY,
+        appId INT NOT NULL,
+        openTime DATETIME NOT NULL,
+        closeTime DATETIME
+    );
+END
+GO
+
 -- Create monarch tables
 
 USE monarch;
-
-IF OBJECT_ID('users', 'U') IS NULL
-BEGIN
-    CREATE TABLE users (
-        userId INT PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        email VARCHAR(100) NOT NULL UNIQUE,
-        role VARCHAR(100) NOT NULL,
-        profilePicture VARCHAR(255)
-    );
-END
-GO
-
-IF OBJECT_ID('teams', 'U') IS NULL
-BEGIN
-    CREATE TABLE teams (
-        teamId INT PRIMARY KEY,
-        teamName VARCHAR(100) NOT NULL,
-        slackChannel VARCHAR(255),
-        jiraBoard VARCHAR(255),
-        smtpGroup VARCHAR(100)
-    );
-END
-GO
-
-IF OBJECT_ID('userTeams', 'U') IS NULL
-BEGIN
-    CREATE TABLE userTeams (
-        userId INT NOT NULL,
-        teamId INT NOT NULL
-    );
-END
-GO
 
 IF OBJECT_ID('apps', 'U') IS NULL
 BEGIN
@@ -259,26 +228,6 @@ BEGIN
 END
 GO
 
-IF OBJECT_ID('incidents', 'U') IS NULL
-BEGIN
-    CREATE TABLE incidents (
-        incidentId INT IDENTITY(1,1) PRIMARY KEY,
-        appId INT NOT NULL,
-        openTime DATETIME NOT NULL,
-        closeTime DATETIME
-    );
-END
-GO
-
-IF OBJECT_ID('appTeams', 'U') IS NULL
-BEGIN
-    CREATE TABLE appTeams (
-        teamId INT NOT NULL,
-        appId INT NOT NULL
-    );
-END
-GO
-
 IF OBJECT_ID('filters', 'U') IS NULL
 BEGIN
     CREATE TABLE filters (
@@ -292,7 +241,16 @@ IF OBJECT_ID('appFilters', 'U') IS NULL
 BEGIN
     CREATE TABLE appFilters (
         filterId INT NOT NULL,
-        appId INT NOT NULL
+        appId INT NOT NULL,
+        PRIMARY KEY (filterId, appId),
+        CONSTRAINT fkApp
+        FOREIGN KEY (appId)
+        REFERENCES apps(appId)
+        ON DELETE CASCADE,
+        CONSTRAINT fkFilter
+        FOREIGN KEY (filterId)
+        REFERENCES filters(filterId)
+        ON DELETE CASCADE
     );
 END
 GO
@@ -312,7 +270,11 @@ BEGIN
     CREATE TABLE appSlackChannels (
         appId INT NOT NULL,
         channelKey VARCHAR(100) NOT NULL,
-        PRIMARY KEY (appId, channelKey)
+        PRIMARY KEY (appId, channelKey),
+        CONSTRAINT fkApp
+        FOREIGN KEY (appId)
+        REFERENCES apps(appId)
+        ON DELETE CASCADE
     );
 END
 GO
@@ -322,7 +284,11 @@ BEGIN
     CREATE TABLE appJiraWorkspaces (
         appId INT NOT NULL,
         workspaceKey VARCHAR(100) NOT NULL,
-        PRIMARY KEY (appId, workspaceKey)
+        PRIMARY KEY (appId, workspaceKey),
+        CONSTRAINT fkApp
+        FOREIGN KEY (appId)
+        REFERENCES apps(appId)
+        ON DELETE CASCADE
     );
 END
 GO
