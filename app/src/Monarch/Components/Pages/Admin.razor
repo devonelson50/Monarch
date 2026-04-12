@@ -439,48 +439,34 @@ Monarch Admin Page
         }
     }
 
-    // ===== Create New App =====
-
-    private void ShowCreateForm()
-    {
-        showCreateForm = true;
-        newAppName = "";
+    private void PromptDelete(DeleteTarget target, int id, string name){
+        currentDeleteTarget = target;
+        itemToDeleteId = id;
+        itemToDeleteName = name;
+        confirmNameInput = "";
+        showDeleteConfirmation = true;
     }
 
-    private void CancelCreate()
+    private void CancelDelete()
     {
-        showCreateForm = false;
-        newAppName = "";
+        showDeleteConfirmation = false;
     }
 
-    private void CreateNewApp()
+    private async Task ConfirmDelete()
     {
-        if (string.IsNullOrWhiteSpace(newAppName))
-            return;
+        showDeleteConfirmation = false;
 
-        // Prepare a temporary MonarchApp object - don't save to DB yet
-        currentApp = new AppModel
+        if (currentDeleteTarget == DeleteTarget.App)
         {
-            AppId = 0, // Will be assigned after save
-            AppName = newAppName.Trim(),
-            Status = (StatusType)3,
-            NewRelicId = null,
-            NagiosId = null,
-            SlackAlert = false,
-            JiraAlert = false,
-            SmtpAlert = false,
-            Filters = new List<FilterModel>(),
-            SelectedSlackChannels = new List<string>(),
-            SelectedJiraWorkspaces = new List<string>()
-        };
-        activeAppFilterIds.Clear();
-        isNewApp = true;
-        showCreateForm = false;
-        selectedAppId = 0;
-        newAppName = "";
-        saveStatus = "Configure the new application and click 'Save Changes' at the bottom to create it.";
-        saveStatusClass = "status-message status-info";
+            await DeleteConfiguration(itemToDeleteId);
+        } else {
+            await DeleteFilter(itemToDeleteId);
+        }
     }
+
+    private bool IsDeleteDisabled =>
+        currentDeleteTarget == DeleteTarget.App &&
+        !string.Equals(confirmNameInput, itemToDeleteName, StringComparison.OrdinalIgnoreCase);
 
     // ===== Multi-Select Toggles =====
 
