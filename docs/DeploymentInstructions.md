@@ -12,6 +12,7 @@
     - [monapi-worker: kafka\_server](#monapi-worker-kafka_server)
     - [monapi-worker: kafka\_port](#monapi-worker-kafka_port)
     - [monapi-worker: kafka\_user](#monapi-worker-kafka_user)
+    - [keycloak: KC\_HOSTNAME](#keycloak-kc_hostname)
   - [Docker Secrets](#docker-secrets)
     - [Nagios API Key](#nagios-api-key)
     - [New Relic API Key](#new-relic-api-key)
@@ -56,10 +57,11 @@ This document assumes the administrator deploying Monarch is familiar with their
 | Nagios | {Your Nagios Host} | TCP | 443 | Retrieve monitoring data |
 | Jira | {Your Subdomain}.atlassian.net | TCP | 443 | Create Jira Issues |
 | Slack | hooks.slack.com | TCP | 443 | Send Slack alerts via webhook(s) |
+| Kafka | {Your Kafka Host} | TCP | `kafka_port` | Send content to Kafka broker | 
 | DNS | * | UDP | 53 | External name resolution |
 | NTP | * | UDP | 123 | Time synchronization |
 
-The stack is delivered without the connection between `keycloak` and an external identity provider having been established. Please refer to your identity provider's documentation to for notes regarding their outbound connectivity requirements.
+The stack is delivered without the connection between `keycloak` and an external identity provider having been established. Please refer to your identity provider's documentation for notes regarding their outbound connectivity requirements.
 
 Accurate time synchronization is required to ensure monitoring data and notifications are properly handled, and for public certificate verification.
 
@@ -110,6 +112,8 @@ Our current implementation assumes the broker will offer an encrypted connection
 ### monapi-worker: kafka_user
 `kafka_user` will accept the intended user name.
 
+### keycloak: KC_HOSTNAME
+`KC_HOSTNAME` must match what is presented to the end-user's browser.
 ## Docker Secrets
 > Monarch will be delivered with all Docker Secrets configured for injection from an external source.
 
