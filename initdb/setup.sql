@@ -241,7 +241,16 @@ IF OBJECT_ID('appFilters', 'U') IS NULL
 BEGIN
     CREATE TABLE appFilters (
         filterId INT NOT NULL,
-        appId INT NOT NULL
+        appId INT NOT NULL,
+        PRIMARY KEY (filterId, appId),
+        CONSTRAINT fkApp
+        FOREIGN KEY (appId)
+        REFERENCES apps(appId)
+        ON DELETE CASCADE,
+        CONSTRAINT fkFilter
+        FOREIGN KEY (filterId)
+        REFERENCES filters(filterId)
+        ON DELETE CASCADE
     );
 END
 GO
@@ -261,7 +270,11 @@ BEGIN
     CREATE TABLE appSlackChannels (
         appId INT NOT NULL,
         channelKey VARCHAR(100) NOT NULL,
-        PRIMARY KEY (appId, channelKey)
+        PRIMARY KEY (appId, channelKey),
+        CONSTRAINT fkApp
+        FOREIGN KEY (appId)
+        REFERENCES apps(appId)
+        ON DELETE CASCADE
     );
 END
 GO
@@ -271,7 +284,11 @@ BEGIN
     CREATE TABLE appJiraWorkspaces (
         appId INT NOT NULL,
         workspaceKey VARCHAR(100) NOT NULL,
-        PRIMARY KEY (appId, workspaceKey)
+        PRIMARY KEY (appId, workspaceKey),
+        CONSTRAINT fkApp
+        FOREIGN KEY (appId)
+        REFERENCES apps(appId)
+        ON DELETE CASCADE
     );
 END
 GO
