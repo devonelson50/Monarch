@@ -39,21 +39,21 @@ GO
 USE master;
 IF SUSER_ID('monarch') IS NOT NULL
 BEGIN
-    PRINT "Dropping pre-existing monarch account.";
+    PRINT 'Dropping pre-existing monarch account.';
     DROP LOGIN monarch;
 END 
 GO
 
 IF SUSER_ID('monapi') IS NOT NULL
 BEGIN
-    PRINT "Dropping pre-existing monapi account.";
+    PRINT 'Dropping pre-existing monapi account.';
     DROP LOGIN monapi;
 END 
 GO
 
 IF SUSER_ID('keycloak') IS NOT NULL
 BEGIN
-    PRINT "Dropping pre-existing keycloak account.";
+    PRINT 'Dropping pre-existing keycloak account.';
     DROP LOGIN keycloak;
 END 
 GO
@@ -90,15 +90,15 @@ GO
 -- Create/update service accounts
 
 USE master;
-PRINT "Creating monarch service account.";
+PRINT 'Creating monarch service account.';
 CREATE LOGIN monarch WITH PASSWORD = N'$(MONARCH_PASSWORD)';
 GO
 
-PRINT "Creating monapi service account.";
+PRINT 'Creating monapi service account.';
 CREATE LOGIN monapi WITH PASSWORD = N'$(MONAPI_PASSWORD)';
 GO
 
-PRINT "Creating keycloak service account.";
+PRINT 'Creating keycloak service account.';
 CREATE LOGIN keycloak WITH PASSWORD = N'$(KEYCLOAK_PASSWORD)';
 GO
 
@@ -144,7 +144,7 @@ BEGIN
         output VARCHAR(500),
         statusUpdateTime DATETIME,
         lastCheck DATETIME
-    );END
+    ); END
 GO
 
 IF OBJECT_ID('nagiosApps', 'U') IS NULL
@@ -243,7 +243,7 @@ BEGIN
         filterId INT NOT NULL,
         appId INT NOT NULL,
         PRIMARY KEY (filterId, appId),
-        CONSTRAINT fkApp
+        CONSTRAINT fkApp_appFilters
         FOREIGN KEY (appId)
         REFERENCES apps(appId)
         ON DELETE CASCADE,
@@ -271,7 +271,7 @@ BEGIN
         appId INT NOT NULL,
         channelKey VARCHAR(100) NOT NULL,
         PRIMARY KEY (appId, channelKey),
-        CONSTRAINT fkApp
+        CONSTRAINT fkApp_appSlackChannels
         FOREIGN KEY (appId)
         REFERENCES apps(appId)
         ON DELETE CASCADE
@@ -285,7 +285,7 @@ BEGIN
         appId INT NOT NULL,
         workspaceKey VARCHAR(100) NOT NULL,
         PRIMARY KEY (appId, workspaceKey),
-        CONSTRAINT fkApp
+        CONSTRAINT fkApp_appJiraWorkspaces
         FOREIGN KEY (appId)
         REFERENCES apps(appId)
         ON DELETE CASCADE
