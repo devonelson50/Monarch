@@ -127,7 +127,6 @@ Monarch Application Tile Component
 
     private bool IsExpanded { get; set; }
 
-    // New fields for data fetching
     private bool isLoadingDetails = false;
     private AppDetails? details;
 
@@ -135,7 +134,6 @@ Monarch Application Tile Component
     {
         IsExpanded = !IsExpanded;
 
-        // NEW: Lazy Load Logic
         if (IsExpanded && details == null)
         {
             isLoadingDetails = true;
