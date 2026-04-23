@@ -36,5 +36,25 @@ namespace Monapi.Worker.Slack
             var response = await _httpClient.PostAsync(webhookUrl, content);
             response.EnsureSuccessStatusCode();
         }
+
+        public async Task BroadcastMessageAsync(string message)
+        {
+            var payload = new { text = message };
+            var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+            foreach (var webhook in _webhooks)
+            {
+                try
+                {
+                    var response = await _httpClient.PostAsync(webhook.Value, content);
+                    response.EnsureSuccessStatusCode();
+                    Console.WriteLine($"Broadcasted alert to Slack channel: {webhook.Key}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Failed to broadcast to Slack Channel '{webhook.Key}': {ex.Message}");
+                }
+            }
+        }
     }
 }

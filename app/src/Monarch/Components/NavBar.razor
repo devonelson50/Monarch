@@ -147,12 +147,8 @@
 </style>
 
 @code {
-    
-    // Admin console now lives at /admin route — no code-behind needed here.
-
     [Parameter] public EventCallback OnApplicationAdded { get; set; }
 
-    // Switch to show/hide Add Application modal
     private bool showAddApp = false;
     private void ToggleAddApp() => showAddApp = !showAddApp;
 

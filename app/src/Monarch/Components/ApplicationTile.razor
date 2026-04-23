@@ -7,6 +7,8 @@ Monarch Application Tile Component
 
 @using Monarch.Models
 @using Monarch.Services
+@using Microsoft.AspNetCore.Components.Authorization
+
 @inject AppLoadService LoadService
 
 <div class="app-tile @GetStatusClass() @(IsExpanded ? "expanded" : string.Empty)">
@@ -21,6 +23,15 @@ Monarch Application Tile Component
                         d="M7 3H3v4h2V5h2V3zm12 0h-4v2h2v2h2V3zM5 17H3v4h4v-2H5v-2zm14 0h-2v2h-2v2h4v-4z" />
                 </svg>
             </button>
+            <AuthorizeView Policy="Admin">
+                <Authorized>
+                    <a class="edit-btn" title="Edit" aria-label="Edit" href="/admin?appId=@App.AppId">
+                        <svg class="edit-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                            <path fill="currentColor"
+                                d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />                </svg>
+                    </a>
+                </Authorized>
+            </AuthorizeView>
         </div>
     </div>
 
@@ -36,78 +47,83 @@ Monarch Application Tile Component
             }
             else if (details != null)
             {
-                <div class="common-row">
-                    <div class="info-pill">
+                <div class="section-divider span-full">
+                    <span>General Details</span>
+                </div>
+
+                <div class="metric-grid">
+
+                    <div class="metric-row">
                         <span class="label">IP:</span>
                         <span class="value">@details.IpAddress</span>
                     </div>
+
+                    <div class="metric-row">
+                        <span class="label">Last Updated:</span>
+                        <span class="value">@($"{LastRefresh:HH:mm:ss}")</span>
+                    </div>
+
                 </div>
 
-                <div class="platform-grid">
+                @if (App.NewRelicId != null)
+                {                          
+                    <div class="section-divider span-full">
+                        <span>New Relic</span>
+                    </div>
+
+                    <div class="metric-grid">
+
+                        <div class="metric-row">
+                            <span class="label">CPU Usage:</span>
+                            <span class="value">@details.nrCpuUsage.ToString("0.0")%</span>
+                            <div class="bar-track">
+                                <div class="bar-fill span-full @GetDynamicBarColor(details.nrCpuUsage)" style="width: @Math.Min(details.nrCpuUsage, 100)%"></div>
+                            </div>
+                        </div>
+
+                        <div class="metric-row">
+                            <span class="label">Latency:</span>
+                            <span class="value">@details.nrLatency ms</span>
+                            <div class="bar-track">
+                                <div class="bar-fill @GetDynamicBarColor(details.nrLatency / 2)" style="width: @(Math.Min(details.nrLatency / 2, 100))%"></div>
+                            </div>
+                        </div>
+
+                        <div class="metric-row span-full">
+                            <span class="label">Status:</span>
+                            <span class="bar-full @GetNagiosStateClass(details.nrStatus)">
+                                @GetNagiosStateLabel(details.nrStatus)</span>
+                        </div>
+
+                    </div>
+                }
+
+                @if (App.NagiosId != null)
+                {
+                    <div class="section-divider span-full">
+                        <span>Nagios</span>
+                    </div>
+
+                    <div class="metric-grid">
+
+                        <div class="metric-row">
+                            <span class="label">Perf Data:</span>
+                            <span class="value code">@DisplayData(details.perfData)</span>
+                        </div>
+                        
+                        <div class="metric-row">
+                            <span class="label">Latency:</span>
+                            <span class="value">@($"{details.latency * 1000} ms")</span>
+                        </div>
+
+                        <div class="metric-row span-full">
+                            <span class="label">Status:</span>
+                            <span class="bar-full @GetNagiosStateClass(details.currentState)">
+                                @GetNagiosStateLabel(details.currentState)</span>
+                        </div>
                     
-                    @if (App.NewRelicId != null)
-                    {
-                        <div class="platform-card new-relic">
-                            <div class="card-header">
-                                <span class="platform-icon">NR</span> New Relic
-                                <span class="last-check">Checked @GetTimeAgo(details.nrLastCheck)</span>
-                            </div>
-                            
-                            <div class="metric-grid">
-                                <div class="metric-item">
-                                    <span class="label">CPU Usage</span>
-                                    <span class="value">@details.nrCpuUsage.ToString("0.0")%</span>
-                                    <div class="bar-bg"><div class="bar-fill" style="width: @Math.Min(details.nrCpuUsage, 100)%"></div></div>
-                                </div>
-
-                                <div class="metric-item">
-                                    <span class="label">Latency</span>
-                                    <span class="value">@details.nrLatency ms</span>
-                                    <div class="bar-bg"><div class="bar-fill latency" style="width: @(Math.Min(details.nrLatency / 2, 100))%"></div></div>
-                                </div>
-
-                                <div class="metric-item">
-                                    <span class="label">Throughput</span>
-                                    <span class="value">@details.nrThroughput rpm</span>
-                                </div>
-                            </div>
-                        </div>
-                    }
-
-                    @if (App.NagiosId != null)
-                    {
-                        <div class="platform-card nagios">
-                            <div class="card-header">
-                                <span class="platform-icon">N</span> Nagios
-                                <span class="last-check">Changed @GetTimeAgo(details.lastStateChange)</span>
-                            </div>
-
-                            <div class="metric-list">
-                                <div class="metric-row">
-                                    <span class="label">Status:</span>
-                                    <span class="value badge @GetNagiosStateClass(details.currentState)">
-                                        @GetNagiosStateLabel(details.currentState)
-                                    </span>
-                                </div>
-                                
-                                <div class="metric-row">
-                                    <span class="label">Output:</span>
-                                    <span class="value text-wrap">@details.output</span>
-                                </div>
-
-                                <div class="metric-row">
-                                    <span class="label">Perf Data:</span>
-                                    <span class="value code">@details.perfData</span>
-                                </div>
-                                
-                                <div class="metric-row">
-                                    <span class="label">Latency:</span>
-                                    <span class="value">@details.latency</span>
-                                </div>
-                            </div>
-                        </div>
-                    }
-                </div>
+                    </div>
+                }
             }
             else
             {
@@ -124,6 +140,11 @@ Monarch Application Tile Component
 
     [Parameter]
     public EventCallback<AppModel> OnExpand { get; set; }
+
+    [Parameter]
+    public DateTime LastRefresh { get; set; }
+
+    private DateTime trackedRefresh;
 
     private bool IsExpanded { get; set; }
 
@@ -157,6 +178,30 @@ Monarch Application Tile Component
         }
     }
 
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsExpanded && LastRefresh != trackedRefresh)
+        {
+            trackedRefresh = LastRefresh;
+
+            try
+            {
+                var newDetails = await LoadService.GetDetailsAsync(App);
+                
+                if (newDetails != null) 
+                {
+                    details = newDetails;
+                }
+
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating live metrics: {ex.Message}");
+            }
+        }
+    }
+
     private string GetStatusClass() => App.Status switch
     {
         StatusType.Operational => "status-operational",
@@ -165,7 +210,19 @@ Monarch Application Tile Component
         _ => "status-unknown"
     };
 
-private string GetNagiosStateLabel(int state) => state switch
+    private string GetDynamicBarColor(double percentage)
+    {
+        if (percentage < 60) return "bar-green";
+        if (percentage < 85) return "bar-yellow";
+        return "bar-red";
+    }
+
+    private string DisplayData(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "No data found" : value;
+    }
+
+    private string GetNagiosStateLabel(int state) => state switch
     {
         0 => "OK", 1 => "WARNING", 2 => "CRITICAL", 3 => "UNKNOWN", _ => "N/A"
     };
@@ -174,16 +231,6 @@ private string GetNagiosStateLabel(int state) => state switch
     {
         0 => "bg-success", 1 => "bg-warning", 2 => "bg-danger", _ => "bg-secondary"
     };
-
-    private string GetTimeAgo(DateTime dt)
-    {
-        if (dt <= DateTime.MinValue) return "Never";
-        var span = DateTime.Now - dt;
-        if (span.TotalMinutes < 1) return "Just now";
-        if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes}m ago";
-        if (span.TotalHours < 24) return $"{(int)span.TotalHours}h ago";
-        return dt.ToString("MMM dd");
-    }
 }
 
 
@@ -220,7 +267,7 @@ private string GetNagiosStateLabel(int state) => state switch
         border-radius: 50%;
     }
 
-    .expand-btn {
+    .expand-btn, .edit-btn{
         background: transparent;
         border: none;
         color: #ffffff;
@@ -234,13 +281,13 @@ private string GetNagiosStateLabel(int state) => state switch
         transition: all 0.2s ease;
     }
 
-    .expand-btn:hover {
+    .expand-btn:hover, .edit-btn:hover{
         opacity: 1;
         background-color: rgba(255, 255, 255, 0.08);
         transform: scale(1.1);
     }
 
-    .expand-icon {
+    .expand-icon, .edit-icon{
         display: block;
         transition: transform 0.3s ease;
     }
@@ -294,18 +341,86 @@ private string GetNagiosStateLabel(int state) => state switch
         display: flex;
         flex-direction: column;
         gap: 6px;
+        margin: 0;
     }
 
     .metric .label,
     .metric-row .label {
         font-size: 12px;
         color: #BDBDBD;
+        margin-bottom: -8px;
     }
 
     .metric .value {
         font-size: 13px;
         color: #FFFFFF;
         font-weight: 600;
+    }
+
+    .section-divider {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #2D2D2D; 
+        padding: 6px 0;
+        border-radius: 4px;
+        margin-top: 8px; 
+        margin-bottom: -8px;
+    }
+
+    .section-divider span {
+        color: #888888;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        line-height: 1;
+    }
+
+    .metric-card {
+        background-color: #383838;
+        border: 1px solid #4a4a4a;
+        border-radius: 8px;
+        padding: 24px;
+        margin-top: 12px;
+    }
+
+    .metric-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        row-gap: 16px;
+        column-gap: 40px;
+        margin-top: 12px;
+    }
+
+    .metric-block {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .span-full {
+        grid-column: 1 / -1;
+    }
+
+    .metric-label {
+        color: #a0a0a0;
+        font-size: 13px;
+        margin-bottom: 8px;
+    }
+
+    .metric-value {
+        color: #ffffff;
+        font-size: 16px;
+        font-weight: 700;
+    }
+
+    .bar-track {
+        background-color: #4a4a4a;
+        height: 6px;
+        border-radius: 3px;
+        width: 100%;
+        overflow: hidden;
+        margin-top: 4px;
     }
 
     .muted {
@@ -320,18 +435,30 @@ private string GetNagiosStateLabel(int state) => state switch
         overflow: hidden;
     }
 
-    .bar .fill {
+    .bar-fill {
         height: 100%;
-        background: #4CAF50;
-        /* green */
     }
 
-    .bar .fill.yellow {
+    .bar-yellow {
         background: #FFC107;
     }
 
-    .bar .fill.red {
+    .bar-red {
         background: #F44336;
+    }
+
+    .bar-green {
+        background: #4CAF50;
+    }
+
+    .bar-full {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #2D2D2D; 
+        padding: 1px 0;
+        border-radius: 4px;
+        margin-top: 8px;
     }
 
     .status-operational .status-dot {

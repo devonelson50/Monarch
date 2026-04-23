@@ -96,19 +96,19 @@ public class NewRelicConnector
             {
                 foreach (var result in results)
                 {
-                    var hostName = result["facet"]?.ToString() ?? "Unknown";
+                    var hostName = result?["facet"]?.ToString() ?? "Unknown";
                     
                     apps.Add(new NewRelicApp
                     {
                         AppName = hostName,
-                        AppId = Convert.ToInt32(double.Parse(result["id"]?.ToString() ?? "0")),
-                        IpAddress = result["ip"]?.ToString() ?? "0.0.0.0",
-                        Status = Convert.ToInt32(double.Parse(result["state"]?.ToString() ?? "0")),
-                        Latency = Convert.ToInt32(double.Parse(result["lat"]?.ToString() ?? "0")),
-                        CpuUsage = double.Parse(result["cpu"]?.ToString() ?? "0.0"),
-                        Throughput = Convert.ToInt32(double.Parse(result["tput"]?.ToString() ?? "0")),
-                        Output = result["msg"]?.ToString() ?? "",
-                        StatusUpdateTime =  DateTime.TryParse(result["updated"]?.ToString(), out var dt) ? dt : DateTime.Now
+                        AppId = Convert.ToInt32(double.Parse(result?["id"]?.ToString() ?? "0")),
+                        IpAddress = result?["ip"]?.ToString() ?? "0.0.0.0",
+                        Status = Convert.ToInt32(double.Parse(result?["state"]?.ToString() ?? "0")),
+                        Latency = Convert.ToInt32(double.Parse(result?["lat"]?.ToString() ?? "0")),
+                        CpuUsage = double.Parse(result?["cpu"]?.ToString() ?? "0.0"),
+                        Throughput = Convert.ToInt32(double.Parse(result?["tput"]?.ToString() ?? "0")),
+                        Output = result?["msg"]?.ToString() ?? "",
+                        StatusUpdateTime =  DateTime.TryParse(result?["updated"]?.ToString(), out var dt) ? dt : DateTime.Now
                     });
                 }
             }

@@ -92,7 +92,7 @@ Monarch Dashboard Page
                     draggable="true" @ondragstart="@(() => OnDragStart(app.AppId))" @ondragover:preventDefault="true"
                     @ondragover="@(() => OnDragOver(app.AppId))" @ondrop="@(() => OnDrop(app.AppId))" @ondragend="OnDragEnd"
                     @key="app.AppId">
-                    <ApplicationTile App="app" />
+                    <ApplicationTile App="app" LastRefresh="lastRefresh"/>
                 </div>
             }
         </div>
@@ -127,6 +127,8 @@ Monarch Dashboard Page
     private int secondsRemaining = 30;
     private double circumference = 62.8;
     private double StrokeOffset => circumference - (circumference * ((double)secondsRemaining / 30));
+    private int connFailNumber = 0;
+    private DateTime lastRefresh = DateTime.Now;
 
     private async Task OnApplicationAdded()
     {
@@ -204,6 +206,8 @@ Monarch Dashboard Page
             var refreshedApps = await Task.WhenAll(tasks);
 
             allApplications = refreshedApps.ToList();
+
+            lastRefresh = DateTime.Now;
             
             ApplySort();
         }
@@ -264,7 +268,7 @@ Monarch Dashboard Page
         if(searchQuery != null)
         {
             filteredApps = filteredApps.Where(app =>
-                app.AppName.Contains(searchQuery));
+                app.AppName.ToUpper().Contains(searchQuery.ToUpper()));
         }
 
         if (selectedFilterIds.Any())
@@ -544,7 +548,7 @@ Monarch Dashboard Page
         align-items: center;
         gap: 12px;
         padding: 8px 16px;
-        background-color: #2b2b2b; 
+        background-color: transparent; 
         border-top-right-radius: 6px;
     }
 
