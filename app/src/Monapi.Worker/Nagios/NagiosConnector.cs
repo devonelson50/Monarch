@@ -84,7 +84,7 @@ public class NagiosConnector
         {
             await sqlConnection.OpenAsync();
             JsonNode jNode = JsonNode.Parse(response.Content);
-            var hostList = jNode["hoststatus"]?.AsArray();
+            var hostList = jNode?["hoststatus"]?.AsArray();
             if (hostList == null)
             {
                 Console.WriteLine("WARN: Host list is empty!");

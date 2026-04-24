@@ -92,11 +92,21 @@ Monarch Dashboard Page
                     draggable="true" @ondragstart="@(() => OnDragStart(app.AppId))" @ondragover:preventDefault="true"
                     @ondragover="@(() => OnDragOver(app.AppId))" @ondrop="@(() => OnDrop(app.AppId))" @ondragend="OnDragEnd"
                     @key="app.AppId">
-                    <ApplicationTile App="app" />
+                    <ApplicationTile App="app" LastRefresh="lastRefresh"/>
                 </div>
             }
         </div>
     }
+    <div class="status-footer">        
+        <div class="circular-timer" title="Refreshing in @(secondsRemaining)s">
+            <svg width="24" height="24" viewBox="0 0 24 24">
+                <circle class="timer-bg" cx="12" cy="12" r="10" />
+                
+                <circle class="timer-progress" cx="12" cy="12" r="10"
+                        style="stroke-dashoffset: @(StrokeOffset)px;" />
+            </svg>
+        </div>
+    </div>
 </div>
 
 @code {
@@ -114,6 +124,11 @@ Monarch Dashboard Page
     private System.Threading.Timer? refreshTimer;
     private List<FilterModel> availableFilters = new();
     private List<int> selectedFilterIds = new();
+    private int secondsRemaining = 30;
+    private double circumference = 62.8;
+    private double StrokeOffset => circumference - (circumference * ((double)secondsRemaining / 30));
+    private int connFailNumber = 0;
+    private DateTime lastRefresh = DateTime.Now;
 
     private async Task OnApplicationAdded()
     {
@@ -137,9 +152,15 @@ Monarch Dashboard Page
         // Refresh data every 30 seconds to see live updates
         refreshTimer = new System.Threading.Timer(async _ =>
         {
-            await RefreshApplications();
+            secondsRemaining--;
+            if (secondsRemaining <= 0)
+            {
+                secondsRemaining = 30;
+                await RefreshApplications();
+            }
+
             await InvokeAsync(StateHasChanged);
-        }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+        }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
     }
 
     private async Task LoadApplicationsFromDatabase()
@@ -185,6 +206,8 @@ Monarch Dashboard Page
             var refreshedApps = await Task.WhenAll(tasks);
 
             allApplications = refreshedApps.ToList();
+
+            lastRefresh = DateTime.Now;
             
             ApplySort();
         }
@@ -245,7 +268,7 @@ Monarch Dashboard Page
         if(searchQuery != null)
         {
             filteredApps = filteredApps.Where(app =>
-                app.AppName.Contains(searchQuery));
+                app.AppName.ToUpper().Contains(searchQuery.ToUpper()));
         }
 
         if (selectedFilterIds.Any())
@@ -516,10 +539,47 @@ Monarch Dashboard Page
     .search-bar::placeholder {
         color: #A0A0A0; /* Softens the placeholder text to match your theme */
     }
+    
+    .status-footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 16px;
+        background-color: transparent; 
+        border-top-right-radius: 6px;
+    }
+
+    .status-text {
+        color: #888;
+        font-size: 14px;
+    }
+
+    .circular-timer svg {
+        transform: rotate(-90deg);
+        display: block;
+    }
+
+    .timer-bg {
+        fill: none;
+        stroke: #444; 
+        stroke-width: 2.5;
+    }
+
+    .timer-progress {
+        fill: none;
+        stroke: #FFFFFF;
+        stroke-width: 2.5;
+        stroke-linecap: round;
+        stroke-dasharray: 62.8; 
+        transition: stroke-dashoffset 1s linear; 
+    }
 
     @@media (max-width: 900px) {
         .dashboard-header {
-            grid-template-columns: 1fr; /* Changes from 3 columns to 1 */
+            grid-template-columns: 1fr; 
             gap: 16px;
         }
 

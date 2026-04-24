@@ -24,6 +24,9 @@ public class Worker : BackgroundService
     private KafkaConnector? kfc;
     private string? _monarchConnStr;
     private string? _monapiConnStr;
+    private int nagiosFailCount = 0;
+    private int newRelicFailCount = 0;
+    private const int MaxFailures = 5;
 
     public Worker(ILogger<Worker> logger, IConfiguration configuration)
     {
@@ -62,19 +65,52 @@ public class Worker : BackgroundService
         
         while (!stoppingToken.IsCancellationRequested)
         {
+            _logger.LogInformation("--- Starting Sync Cycle: {time} ---", DateTime.Now);
             try
             {
-                _logger.LogInformation("--- Starting Sync Cycle: {time} ---", DateTime.Now);
-
-                Console.WriteLine($"{DateTime.Now:HH:mm:ss} - Refreshing NewRelic data");
                 Console.WriteLine($"{DateTime.Now:HH:mm:ss} - Refreshing Nagios data");
                 await nc.RunConnector();
-                await nrc.RunConnector();
+                nagiosFailCount = 0;
             }
             catch (Exception ex)
             {
-                _logger.LogCritical("!!! WORKER CRASHED DURING SYNC: {type} - {msg}", ex.GetType().Name, ex.Message);
-                _logger.LogDebug(ex.StackTrace);
+                nagiosFailCount++;
+                _logger.LogWarning("Nagios connector failed ({count}/{max}). Error: {msg}",
+                    nagiosFailCount, MaxFailures, ex.Message);
+
+                if (nagiosFailCount >= MaxFailures)
+                {
+                    _logger.LogCritical("!!! CRITICAL ALERT: Nagios Connector has failed 5 times in a row. Last Error: {msg}", ex.Message);
+
+                    await SendSystemAlertAsync("Nagios Connector", ex.Message);
+                    
+                    nagiosFailCount = 0;
+            
+                }
+            
+            }
+            try
+            {
+                Console.WriteLine($"{DateTime.Now:HH:mm:ss} - Refreshing New Relic data");
+                await nrc.RunConnector();
+                newRelicFailCount = 0;
+            }
+            catch (Exception ex)
+            {
+                newRelicFailCount++;
+                _logger.LogWarning("New Relic connector failed ({count}/{max}). Error: {msg}",
+                    newRelicFailCount, MaxFailures, ex.Message);
+
+                if (newRelicFailCount >= MaxFailures)
+                {
+                    _logger.LogCritical("!!! CRITICAL ALERT: Nagios Connector has failed 5 times in a row. Last Error: {msg}", ex.Message);
+
+                    await SendSystemAlertAsync("Nagios Connector", ex.Message);
+
+                    nagiosFailCount = 0;
+            
+                }
+            
             }
 
             // Check for status changes and trigger Jira tickets / Slack notifications
@@ -94,11 +130,11 @@ public class Worker : BackgroundService
         try
         {
             _slackService = new SlackWebhookService("/run/secrets/monarch_slack_webhooks");
-            Console.WriteLine("✅ Slack integration initialized");
+            Console.WriteLine("Slack integration initialized");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"⚠️  Slack integration disabled: {ex.Message}");
+            Console.WriteLine($"Slack integration disabled: {ex.Message}");
         }
     }
 
@@ -111,16 +147,16 @@ public class Worker : BackgroundService
         {
             var jiraApiKey = File.ReadAllText("/run/secrets/monarch_jira_api_key").Trim();
             _jiraManager = new JiraManager(jiraApiKey, _monarchConnStr!, _monapiConnStr!);
-            Console.WriteLine("✅ Jira integration initialized (workspaces loaded from database)");
+            Console.WriteLine("Jira integration initialized (workspaces loaded from database)");
         }
         catch (FileNotFoundException)
         {
-            Console.WriteLine("⚠️  Jira API key not found. Jira integration disabled.");
+            Console.WriteLine("Jira API key not found. Jira integration disabled.");
             Console.WriteLine("   Create secret 'monarch_jira_api_key' with format: email:token");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"⚠️  Failed to initialize Jira integration: {ex.Message}");
+            Console.WriteLine($"Failed to initialize Jira integration: {ex.Message}");
         }
     }
 
@@ -266,7 +302,7 @@ public class Worker : BackgroundService
                     if (prevStatusName != currentStatusName)
                     {
                         var changeTime = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
-                        Console.WriteLine($"📊 Status change: {app.AppName} ({prevStatusName} → {currentStatusName})");
+                        Console.WriteLine($"Status change: {app.AppName} ({prevStatusName} → {currentStatusName})");
 
                         bool isWorsening = IsStatusWorsening(prevStatusName, currentStatusName);
 
@@ -361,6 +397,68 @@ public class Worker : BackgroundService
         catch (Exception ex)
         {
             Console.WriteLine($"Error sending Slack notifications for {appName}: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles system-wide alerts (like connector failures) that are not tied to a specific application ID.
+    /// </summary>
+    private async Task SendSystemAlertAsync(string systemName, string errorMessage)
+    {
+        var alertTime = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+        var message = $"*CRITICAL SYSTEM ALERT*\n" +
+                    $"*{systemName}* has failed 5 consecutive times.\n" +
+                    $"*Time:* {alertTime} UTC\n" +
+                    $"*Error:* {errorMessage}";
+
+        if (_slackService != null)
+        {
+            await _slackService.BroadcastMessageAsync(message);
+        }
+
+        kfc?.WriteMessage($"{systemName} System", "2", "0");
+
+        try
+        {
+            if (_monarchConnStr == null) return;
+            
+            string? jiraBaseUrl = null;
+            string? jiraWorkspaceKey = null;
+
+            using (var conn = new SqlConnection(_monarchConnStr))
+            {
+                await conn.OpenAsync();
+                var query = "SELECT TOP 1 baseUrl, workspaceKey FROM jiraWorkspaces";
+                using var cmd = new SqlCommand(query, conn);
+                using var reader = await cmd.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    jiraBaseUrl = reader.GetString(0);
+                    jiraWorkspaceKey = reader.GetString(1);
+                }
+            }
+
+            if (jiraBaseUrl != null && jiraWorkspaceKey != null)
+            {
+                var jiraApiKey = File.ReadAllText("/run/secrets/monarch_jira_api_key").Trim();
+                var connector = new JiraConnector(jiraBaseUrl, jiraWorkspaceKey, jiraApiKey);
+                
+                var issueTypeId = await connector.ResolveIssueTypeId();
+                if (issueTypeId != null)
+                {
+                    await connector.CreateIncidentIssue(
+                        appName: $"{systemName} System",
+                        status: "Down",
+                        issueTypeId: issueTypeId,
+                        priority: "High",
+                        metricDetails: $"Connector background loop crashed. Error: {errorMessage}"
+                    );
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to create system Jira ticket for {systemName}: {ex.Message}");
         }
     }
 }

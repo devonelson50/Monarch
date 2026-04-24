@@ -320,7 +320,10 @@ Monarch Admin Page
 
                 @if (!string.IsNullOrEmpty(saveStatus))
                 {
-                    <p class="@saveStatusClass">@saveStatus</p>
+                    <div class = "@saveStatusClass">
+                        <p class="status-message">@saveStatus</p>
+                        <p class="refresh-timer">@($"Page will refresh in {timeTilRefresh}")</p>
+                    </div>
                 }
             </div>
         </div>
@@ -364,6 +367,9 @@ Monarch Admin Page
     
 
     // Form state
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "appId")]
+    public int? passedAppId { get; set; }
     private int selectedAppId = 0;
     private AppModel? currentApp;
     private string filterSearchText = "";
@@ -390,16 +396,26 @@ Monarch Admin Page
 
     // Save feedback
     private string saveStatus = "";
-    private string saveStatusClass = "status-message";
+    private string saveStatusClass = "status-box";
 
     // Test ticket feedback
     private string testTicketStatus = "";
-    private string testTicketStatusClass = "status-message";
+    private string testTicketStatusClass = "status-box";
     private bool testTicketSending = false;
+    private int timeTilRefresh;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadAllData();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (passedAppId.HasValue && selectedAppId != passedAppId.Value)
+        {
+            selectedAppId = passedAppId.Value;
+            await OnAppSelected();
+        }
     }
 
     /// <summary>
@@ -529,7 +545,7 @@ Monarch Admin Page
         catch (Exception ex)
         {
             saveStatus = $"Error deleting filter: {ex.Message}";
-            saveStatusClass = "status-message status-error";
+            saveStatusClass = "status-box status-error";
         }
     }
 
@@ -585,7 +601,7 @@ Monarch Admin Page
         catch (Exception ex)
         {
             saveStatus = $"Error adding Jira workspace: {ex.Message}";
-            saveStatusClass = "status-message status-error";
+            saveStatusClass = "status-box status-error";
         }
     }
 
@@ -630,7 +646,7 @@ Monarch Admin Page
             }
 
             saveStatus = $"Configuration for '{currentApp.AppName}' saved successfully. Changes will be reflected on the dashboard.";
-            saveStatusClass = "status-message status-success";
+            saveStatusClass = "status-box status-success";
 
             // Reload to reflect saved state
             await LoadAllData();
@@ -639,7 +655,7 @@ Monarch Admin Page
         catch (Exception ex)
         {
             saveStatus = $"Error saving configuration: {ex.Message}";
-            saveStatusClass = "status-message status-error";
+            saveStatusClass = "status-box status-error";
         }
     }
 
@@ -651,6 +667,19 @@ Monarch Admin Page
         testTicketStatus = "";
     }
 
+    private async Task RefreshAsync()
+    {
+        for(int i = 3; i > 0; i--)
+        {
+            timeTilRefresh = i;
+            StateHasChanged();
+            await Task.Delay(1000);
+        }
+        await LoadAllData();
+        currentApp = null;
+        selectedAppId = 0;
+    }
+
     private async Task DeleteConfiguration(int id)
     {
         if(currentApp == null) return;
@@ -660,19 +689,16 @@ Monarch Admin Page
             var deletedAppName = currentApp.AppName;
             await AdminService.DeleteAppAsync(id);
             saveStatus = $"Configuration for '{deletedAppName}' deleted successfully. Changes will be reflected on the dashboard.";
-            saveStatusClass = "status-message status-success";
+            saveStatusClass = "status-box status-success";
 
             StateHasChanged();
 
-            await Task.Delay(3000);
-            await LoadAllData();
-            currentApp = null;
-            selectedAppId = 0;
+            await RefreshAsync();
         }
         catch (Exception ex)
         {
             saveStatus = $"Error deleting configuration: {ex.Message}";
-            saveStatusClass = "status-message status-error";
+            saveStatusClass = "status-box status-error";
         }
     }
 
@@ -682,7 +708,7 @@ Monarch Admin Page
     {
         testTicketSending = true;
         testTicketStatus = "Sending test ticket...";
-        testTicketStatusClass = "status-message status-info";
+        testTicketStatusClass = "status-box status-info";
 
         try
         {
@@ -691,18 +717,18 @@ Monarch Admin Page
             if (result.success)
             {
                 testTicketStatus = result.message;
-                testTicketStatusClass = "status-message status-success";
+                testTicketStatusClass = "status-box status-success";
             }
             else
             {
                 testTicketStatus = result.message;
-                testTicketStatusClass = "status-message status-error";
+                testTicketStatusClass = "status-box status-error";
             }
         }
         catch (Exception ex)
         {
             testTicketStatus = $"Error sending test ticket: {ex.Message}";
-            testTicketStatusClass = "status-message status-error";
+            testTicketStatusClass = "status-box status-error";
         }
         finally
         {
@@ -1197,9 +1223,6 @@ Monarch Admin Page
         background-color: #B32424;
     }
     
-    /* Removed the :active state to match the static click feel of your other buttons */
-
-    /* Optional: If you already have a .btn-large class doing this, you can skip this part */
     .btn-large {
         padding: 12px 24px;
         font-size: 16px;
@@ -1232,10 +1255,25 @@ Monarch Admin Page
     }
 
     .status-message {
+        font-size: 14px;
+    }
+
+    .refresh-timer {
+
+    }
+
+    .status-box {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 14px;
         margin-top: 16px;
         padding: 12px 16px;
         border-radius: 6px;
-        font-size: 14px;
+    }
+
+    .status-box p {
+        margin: 0;
     }
 
     .status-success {
@@ -1256,30 +1294,28 @@ Monarch Admin Page
         border: 1px solid #3D6A7A;
     }
 
-    /*Deletion Confirmation Styles*/
     .modal-backdrop {
         position: fixed;
         top: 0;
         left: 0;
         width: 100vw;
         height: 100vh;
-        background-color: rgba(0, 0, 0, 0.6); /* Semi-transparent black */
+        background-color: rgba(0, 0, 0, 0.6);
         display: flex;
         justify-content: center;
         align-items: center;
-        z-index: 1000; /* Ensures it sits on top of absolutely everything */
+        z-index: 1000; 
     }
 
-    /* The popup box itself */
     .custom-modal {
-        background-color: #2D2D2D; /* Matches your admin page background */
+        background-color: #2D2D2D;
         border: 1px solid #4A4A4A;
         border-radius: 8px;
         padding: 24px;
         width: 100%;
         max-width: 400px;
         color: #FFFFFF;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); /* Gives it a nice pop off the screen */
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); 
     }
 
     .custom-modal h3 {
@@ -1296,7 +1332,6 @@ Monarch Admin Page
         line-height: 1.5;
     }
 
-    /* Push the buttons to the right side of the modal */
     .modal-actions {
         display: flex;
         justify-content: flex-end;
@@ -1320,22 +1355,21 @@ Monarch Admin Page
 
     .modal-validation-group input {
         width: 100%;
-        box-sizing: border-box; /* Ensures padding doesn't break the width */
+        box-sizing: border-box; 
         padding: 10px 12px;
         border: 1px solid #555;
         border-radius: 4px;
-        background-color: #222222; /* Slightly darker than the modal */
+        background-color: #222222; 
         color: #FFFFFF;
         font-size: 14px;
         transition: border-color 0.2s;
     }
 
     .modal-validation-group input:focus {
-        border-color: #D32F2F; /* Red border on focus to match the delete theme */
+        border-color: #D32F2F; 
         outline: none;
     }
 
-    /* Add this to style the disabled state of your delete button */
     .btn-delete:disabled {
         background-color: #4D4D4D;
         color: #888888;
@@ -1344,6 +1378,6 @@ Monarch Admin Page
     }
 
     .btn-delete:disabled:hover {
-        background-color: #4D4D4D; /* Prevent hover effect when disabled */
+        background-color: #4D4D4D; 
     }
 </style>

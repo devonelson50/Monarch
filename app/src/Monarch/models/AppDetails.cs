@@ -23,6 +23,6 @@ namespace Monarch.Models
     public DateTime lastTimeDown { get; set; } = DateTime.Now;
     public DateTime lastTimeUnreachable { get; set; } = DateTime.Now;
     public DateTime lastNotification { get; set; } = DateTime.Now;
-    public string latency { get; set; } = "";
+    public double latency { get; set; } = 0;
   }
 }

@@ -381,7 +381,7 @@ namespace Monarch.Services
                 details.lastTimeDown = Convert.ToDateTime(reader["n_down"]);
                 details.lastTimeUnreachable = Convert.ToDateTime(reader["n_unreach"]);
                 details.lastNotification = Convert.ToDateTime(reader["n_notif"]);
-                details.latency = reader["n_latency"].ToString() ?? "";
+                details.latency = Convert.ToDouble(reader["n_latency"]);
               }
             }
           }
