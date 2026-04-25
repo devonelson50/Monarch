@@ -19,7 +19,7 @@ namespace Monarch.Models
   {
     //Id pulled from newRelicApps table, which is pulled from New Relic directly
     public int AppId { get; set; } = 0;
-    //Mame pulled from newRelicApps table, which is pulled from New Relic directly
+    //Name pulled from newRelicApps table, which is pulled from New Relic directly
     public string AppName { get; set; } = string.Empty;
   }
 }
