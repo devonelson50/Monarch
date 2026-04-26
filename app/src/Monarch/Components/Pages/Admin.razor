@@ -1,5 +1,5 @@
 @*
-Conner Hammonds
+Conner Hammonds & Brady Brown
 Monarch Admin Page
  - Google form style app configuration
  - Select or create an application
@@ -357,52 +357,177 @@ Monarch Admin Page
 }
 
 @code {
-    // Data collections
+      /*
+    Admin Razor Logic
+    Code that detemines all logic for the Admin page
+    Includes the following:
+      - Variables
+        - Data Collection Variables
+          - List<AppModel> monarchApps
+          - List<NewRelicApp> discoveredNewRelicApps
+          - List<NagiosApp> discoveredNagiosApps
+          - List<FilterModel> availableFilters
+          - List<SlackChannel> slackChannels
+          - List<JiraWorkspaceOption> jiraWorkspaces
+        - Form State Variables
+          - Parameter int passedAppId (nullable)
+          - int selectedAppId
+          - AppModel currentApp
+          - string filterSearchText
+          - List<int> activeAppFilterIds
+          - JiraWorkspaceOption newJiraWorkspace
+        - Deletion Variables
+          - enum DeleteTarget
+          - bool showDeleteConfirmation
+          - DeleteTarget currentDeleteTarget
+          - int itemToDeleteId
+          - string itemToDeleteName
+          - string confirmNameInput
+        - Miscellaneous Variables
+          - IEnumerable<FilterModel> FilteredFilters
+          - string saveStatus
+          - string saveStatusClass
+          - string testTicketStatus
+          - string testTicketStatusClass
+          - bool testTicketSending
+          - int timeTilRefresh
+      - Methods
+        - Initialization Methods
+          - OnInitializedAsync()
+          - OnParametersSetAsync()
+          - LoadAllData()
+          - OnAppSelected()
+        - Deletion Methods
+          - PromptDelete(DeleteTarget, int, string)
+          - CancelDelete()
+          - ConfirmDelete()
+          - bool IsDeleteDisabled **is a variable**
+        - Filter Methods
+          - ToggleFilter(int, bool)
+          - HandleFilterKeyDown(KeyboardEventArgs)
+          - DeleteFilter(int)
+        - Miscellaneous Methods
+          - ToggleSlackChannel(string, bool)
+          - ToggleJiraWorkspace(string, bool)
+          - AddJiraWorkspace()
+          - SaveConfiguration()
+          - ResetForm()
+          - RefreshAsync()
+          - DeleteConfiguration(int)
+          - SendTestTicket(string)
+
+
+  */
+
+    //Variables
+
+    //Data Collection Variables
+
+    //List of all Monarch apps in Monarch DB
     private List<AppModel> monarchApps = new();
+
+    //List of all New Relic apps in Monapi DB
     private List<NewRelicApp> discoveredNewRelicApps = new();
+
+    //List of all Nagios apps in Monapi DB
     private List<NagiosApp> discoveredNagiosApps = new();
+
+    //List of all filters in Monarch DB
     private List<FilterModel> availableFilters = new();
+
+    //List of all Slack channels currently configured
     private List<SlackChannel> slackChannels = new();
+
+    //List of all Jira workspaces in Monarch DB
     private List<JiraWorkspaceOption> jiraWorkspaces = new();
     
 
-    // Form state
+    //Form State Variables
+
+    //Parameter from Application Tile
+    //App id that is passed if admin accessed via app "edit" icon
     [Parameter]
     [SupplyParameterFromQuery(Name = "appId")]
     public int? passedAppId { get; set; }
+
+    //Currently selected app's id
+    //Default to none
     private int selectedAppId = 0;
+
+    //App model available for configuration
     private AppModel? currentApp;
+
+    //Filter input text
     private string filterSearchText = "";
+
+    //List of app's currently active filters
     private List<int> activeAppFilterIds = new();
+
+    //Jira workspace blank configuration
+    //New workspaces can be configured by the user if necessary
     private JiraWorkspaceOption newJiraWorkspace = new();
 
-    //For Deletion Purposes
+
+    //Deletion Variables
+
+    //Custom variable for help with deletion
+    //Used to change deletion popup based on item type being deleted
     private enum DeleteTarget
     {
         App,
         Filter
     }
+
+    //Boolean for deletion confirmation popup
     private bool showDeleteConfirmation = false;
+
+    //Current item deletion type
     private DeleteTarget currentDeleteTarget;
+
+    //Current item deletion id
     private int itemToDeleteId;
+
+    //Current item deletion name
     private string itemToDeleteName = "";
+
+    //string for app confirm delete input
     private string confirmNameInput = "";
 
-    // This dynamically filters the list based on what is typed in the search box
+
+    //Miscellaneous Variables
+
+    //List of filters based on filter input text
+    //Filter input is used as creation and search
+    //Helpful when there are lots of filters to scroll through
     private IEnumerable<FilterModel> FilteredFilters =>
         string.IsNullOrWhiteSpace(filterSearchText)
-            ? availableFilters
-            : availableFilters.Where(f => f.FilterName.Contains(filterSearchText, StringComparison.OrdinalIgnoreCase));
+            ? availableFilters //Displays all filters if bar is empty
+            : availableFilters.Where(f => 
+                f.FilterName.Contains(filterSearchText, StringComparison.OrdinalIgnoreCase)); //Only displays filters that include current input if there is input
 
-    // Save feedback
+    //Text for save message
     private string saveStatus = "";
+
+    //String for CSS class for save message
     private string saveStatusClass = "status-box";
 
-    // Test ticket feedback
+    //Text for test ticket message
     private string testTicketStatus = "";
+
+    //String for CSS class for test ticket message
     private string testTicketStatusClass = "status-box";
+
+    //Boolean to show state of test ticket submission
     private bool testTicketSending = false;
+
+    //Amount of time left until the page will refresh after deletion
+    //Used for a countdown that appears in the status confirmation bar
     private int timeTilRefresh;
+    
+
+    //Methods
+
+    //Initialization Methods
 
     protected override async Task OnInitializedAsync()
     {
@@ -455,23 +580,59 @@ Monarch Admin Page
         }
     }
 
+
+    //Deletion Methods
+
+    /*
+    Brady Brown
+    PromptDelete Method
+    Method for when a delete button is selected
+    Uses the same method regardless of app or filter deletion
+    Ends with visualization of delete popup
+    */
     private void PromptDelete(DeleteTarget target, int id, string name){
+
+        //Sets the item type based on what delete button was selected
         currentDeleteTarget = target;
+
+        //Identification of item selected
         itemToDeleteId = id;
         itemToDeleteName = name;
+
+        //Sets confirmation prompt to empty
+        //Only shows up if app is the item type
         confirmNameInput = "";
+
+        //After all variables are properly set, popup appears
         showDeleteConfirmation = true;
     }
 
+    /*
+    Brady Brown
+    CancelDelete Method
+    Method for when delection action is cancelled
+    */
     private void CancelDelete()
     {
+        //Simply makes popup disappear
         showDeleteConfirmation = false;
     }
 
+    /*
+    Brady Brown
+    ConfirmDelete Method
+    Method for when delection action is confirmed
+    Calls other deletion methods based upon deletion target
+    */
+
     private async Task ConfirmDelete()
     {
+        //Makes popup disappear, then actions happen
+        //Deletion confirmation will appear outside of popup window
         showDeleteConfirmation = false;
 
+        //If the target is an app, calls the app deletion method
+        //Otherwise, the filter method is called, as there is no other option
         if (currentDeleteTarget == DeleteTarget.App)
         {
             await DeleteConfiguration(itemToDeleteId);
@@ -480,75 +641,127 @@ Monarch Admin Page
         }
     }
 
+
+    //Boolean for if the delete button is currently disabled
+    //Is disabled until delete confirmation input matches the name of the configuration
+    //Only used for deletion of apps
     private bool IsDeleteDisabled =>
-        currentDeleteTarget == DeleteTarget.App &&
-        !string.Equals(confirmNameInput, itemToDeleteName, StringComparison.OrdinalIgnoreCase);
+        currentDeleteTarget == DeleteTarget.App && //Confirms that deletion is an app
+        !string.Equals(confirmNameInput, itemToDeleteName, StringComparison.OrdinalIgnoreCase); //Checks to see if input box has the name(ignores case)
 
-    // ===== Multi-Select Toggles =====
+    
+    //Filter Methods 
 
+    /*
+    Brady Brown
+    ToggleFilter Method
+    Method that handles when filters are toggled on and off
+    */
     private void ToggleFilter(int filterId, bool isChecked)
     {
+        //Checks to see if filter has now been checked and if the list of active filters does not contain the id of the filter
         if (isChecked && !activeAppFilterIds.Contains(filterId))
         {
+            //if so, adds the filter to the list
             activeAppFilterIds.Add(filterId);
         }
-        else if (!isChecked)
+        else if (!isChecked)//Checks to make sure the filter is not checked
         {
+            //If so, removes it from the list of active filters
             activeAppFilterIds.Remove(filterId);
         }
     }
 
+    /*
+    Brady Brown
+    HandleFilterKeyDown Method
+    Method for handling keyboard events when in filter textbox
+    Primarily used for adding new filters with the enter button
+    If there is a match for the filter that has been typed, enter will add the filter to the list
+    */
     private async Task HandleFilterKeyDown(KeyboardEventArgs e)
     {
+        //Checks for if the key pressed is enter and if the text box has content
         if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(filterSearchText))
         {
+            //If so, checks for the first filter in the list that has the filter name equal to the input box
+            //Ignores casing, to ensure that filters with too similar of names are not added
+            //For instance, there is no need for a "Hardware" filter and a "hardware" filter
             var exactMatch = availableFilters.FirstOrDefault(f => f.FilterName.Equals(filterSearchText, StringComparison.OrdinalIgnoreCase));
 
+            //Checks to see if the match doesn't exist
             if (exactMatch == null)
             {
                 try
                 {
+                    //If so, calls the CreateFilterAsync method from AdminService with the input
+                    //Removes whitespace at the end for entry and returns the auto-id of the new filter
                     int newId = await AdminService.CreateFilterAsync(filterSearchText.Trim());
+                    //Creates a new FilterModel that is set to the auto-id and input text
                     var newFilter = new FilterModel { FilterId = newId, FilterName = filterSearchText.Trim() };
 
+                    //The newly added filter is added to available filters
                     availableFilters.Add(newFilter);
+                    //The filter is then added to the list of active filters
                     activeAppFilterIds.Add(newId);
+                    //Current text in the textbox is now removed as process is over
                     filterSearchText = "";
                 }
                 catch (Exception ex)
                 {
+                    //Catches exceptions when connecting to Monarch DB
+                    //If error, shows error in save message box
                     saveStatus = $"Error creating filter: {ex.Message}";
                     saveStatusClass = "status-messsage status-error";
                 }
             }
             else
+            //Only done if match is found in list
             {
+                //Checks to see if the list of active filters doesn't contain the filter
                 if (!activeAppFilterIds.Contains(exactMatch.FilterId))
                 {
+                    //If so, is added to the list of filters
                     activeAppFilterIds.Add(exactMatch.FilterId);
                 }
+                //Text is removed from filter search as process is over
                 filterSearchText = "";
             }
         }
     }
 
+    /*
+    Brady Brown
+    DeleteFilter Method
+    Method that handles deletion confirmation of filter type
+    Takes input of the filter's id
+    */
+
     private async Task DeleteFilter(int filterId)
     {
         try
         {
+            //Calls the deletion method from AdminService
             await AdminService.DeleteFilterAsync(filterId);
 
+            //Updates the state of the form to remove the filter from list
             StateHasChanged();
 
+            //Loads all data to ensure that all content matches the updated database
             await LoadAllData();
         }
         catch (Exception ex)
         {
+            //Catches exceptions when connecting to the Monarch DB
+            //If error, shows error message in save message box
             saveStatus = $"Error deleting filter: {ex.Message}";
             saveStatusClass = "status-box status-error";
         }
     }
 
+    //Miscellaneous Methods
+
+    // ===== Multi-Select Toggles =====
     private void ToggleSlackChannel(string channelKey, bool isChecked)
     {
         if (currentApp == null) return;
@@ -667,36 +880,67 @@ Monarch Admin Page
         testTicketStatus = "";
     }
 
+    /*
+    Brady Brown
+    RefreshAsync Method
+    Method that automatically refreshes the page and removes the currently selected app
+    Only used when an app is deleted
+    */
     private async Task RefreshAsync()
     {
+        //For loop that is used to keep track of time
+        //Only lasts 3 seconds
         for(int i = 3; i > 0; i--)
         {
+            //Sets the time til refresh to the amount of time now left
             timeTilRefresh = i;
+            //Updates state of page to show correct time left
             StateHasChanged();
+            //Waits 1 second
             await Task.Delay(1000);
         }
+
+        //After time is done, loads proper data from DB
         await LoadAllData();
+        //Sets current app to null and id to 0
         currentApp = null;
         selectedAppId = 0;
     }
 
+    /*
+    Brady Brown
+    DeleteConfiguration Method
+    Method that handles deletion confirmation of application type
+    Takes input of the app's id
+    */
     private async Task DeleteConfiguration(int id)
     {
+        //Checks to see if the current app does not exist
+        //If so, do nothing as there is nothing selected to delete
         if(currentApp == null) return;
 
         try
         {
+            //Set deleted app name to the current app name
             var deletedAppName = currentApp.AppName;
+            //Calls the DeleteAppAsync method from AppAdminService
             await AdminService.DeleteAppAsync(id);
+            //Shows a confirmation message that the app with specified name has been deleted
             saveStatus = $"Configuration for '{deletedAppName}' deleted successfully. Changes will be reflected on the dashboard.";
             saveStatusClass = "status-box status-success";
 
+            //Updates current state of the page to ensure all variables are displayed properly
             StateHasChanged();
 
+            //Calls an automatic page refresh
+            //This is done because the page can no longer edit the selected app, as it no longer exists
+            //Shows a timer in the confirmation message until refresh
             await RefreshAsync();
         }
         catch (Exception ex)
         {
+            //Catches exceptions when connecting to the Monarch DB
+            //If error, shows error message in save message box
             saveStatus = $"Error deleting configuration: {ex.Message}";
             saveStatusClass = "status-box status-error";
         }

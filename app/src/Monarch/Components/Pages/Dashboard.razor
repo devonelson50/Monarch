@@ -114,20 +114,30 @@ Monarch Dashboard Page
     private List<AppModel> applications = new();
     //Backend list of applications for manipulation and then copied to currently displayed
     private List<AppModel> allApplications = new();
+    //Default sort to status
     private string selectedSort = "status";
+    //Set the search bar to empty
     private string? searchQuery = null;
     private int? draggingId;
     private int? dragOverId;
     private bool isLoading = true;
     private bool isFilterDropdownOpen = false;
     private bool isSortDropdownOpen = false;
+    //Initialize a timer to show for page refreshing purposes
     private System.Threading.Timer? refreshTimer;
+    //List of all filters currently in database
     private List<FilterModel> availableFilters = new();
+    //List of ids of filters the user has selected
     private List<int> selectedFilterIds = new();
+    //set initial seconds remaining to 30
     private int secondsRemaining = 30;
+    //Circumference of circle for easy math with timer visualization
     private double circumference = 62.8;
+    //Math done to show the countdown timer circle
     private double StrokeOffset => circumference - (circumference * ((double)secondsRemaining / 30));
     private int connFailNumber = 0;
+    //DateTime to keep track of the latest time the page was refreshed
+    //Initialized to the time the page loads
     private DateTime lastRefresh = DateTime.Now;
 
     private async Task OnApplicationAdded()
@@ -510,8 +520,7 @@ Monarch Dashboard Page
     }
 
     .checkbox input[type="checkbox"] {
-        accent-color: #0078D4; /* Colors the checked box blue to match */
-        cursor: pointer;
+        accent-color: #0078D4; 
         margin: 0;
     }
 
@@ -537,8 +546,7 @@ Monarch Dashboard Page
     }
 
     .search-bar::placeholder {
-        color: #A0A0A0; /* Softens the placeholder text to match your theme */
-    }
+        color: #A0A0A0; 
     
     .status-footer {
         position: fixed;
@@ -585,21 +593,21 @@ Monarch Dashboard Page
 
         .search-container {
             grid-column: 1;
-            order: 1; /* Places search bar on top */
+            order: 1;
         }
 
         .search-bar {
-            max-width: 100%; /* Allows search bar to fill the mobile screen */
+            max-width: 100%;
         }
 
         .filter-section {
             grid-column: 1;
-            order: 2; /* Places filters below search bar */
-            justify-content: space-between; /* Spreads the two buttons evenly */
+            order: 2; 
+            justify-content: space-between; 
         }
 
         .select-container {
-            max-width: none; /* Removes the max-width so buttons can share 50% of the screen */
+            max-width: none;
         }
     }
 </style>
