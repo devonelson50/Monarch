@@ -1,10 +1,43 @@
+
+/*  
+  Brady Brown
+  App Details for Monarch
+  Stores advanced data for applications, used primarily for expanded view
+*/
+
 namespace Monarch.Models
 {
+
+  /*
+  Overall model for app details
+  Includes the following:
+      -string IpAddress
+      -int nrStatus 
+      -int nrLatency
+      -float nrCpuUsage
+      -int nrThroughput
+      -DateTime nrStatusUpdateTime 
+      -DateTime nrLastCheck
+      -DateTime statusUpdateTime
+      -string output
+      -string perfData
+      -int currentState
+      -DateTime lastCheck
+      -DateTime lastTimeUp
+      -DateTime lastTimeDown
+      -DateTime lastTimeUnreachable
+      -DateTime lastNotification
+      -double latency
+  */
+
   public class AppDetails
   {
+    //IP Address pulled from both New Relic and Nagios table
+    //If disagreement, default to New Relic
     public string IpAddress { get; set; } = "0.0.0.0";
 
     //New Relic Data
+    //All data pulled directly from New Relic table in Monapi
     public int nrStatus { get; set; } = 0;
     public int nrLatency { get; set; } = 0;
     public float nrCpuUsage { get; set; } = 0;
@@ -13,6 +46,7 @@ namespace Monarch.Models
     public DateTime nrLastCheck = DateTime.Now;
 
     //Nagios Data
+    //All data pulled directly from Nagios table in Monapi
     public DateTime statusUpdateTime { get; set; } = DateTime.Now;
     public string output { get; set; } = "";
     public string perfData { get; set; } = "";

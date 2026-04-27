@@ -1,3 +1,13 @@
+@*  
+  Brady Brown
+  Add Application Panel for Monarch
+  Allows initial configuration of applications within Dashboard
+  Only visible by Admin users
+  Only a popup panel, shows up above current page
+  Loads "unused" Nagios and New Relic apps to use for configuration
+*@
+
+
 @using Microsoft.AspNetCore.Mvc.ApplicationModels
 @using Monarch.Models
 @using Monarch.Services
@@ -76,10 +86,9 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1050; /* Keeps it above your NavBar */
+    z-index: 1050;
   }
 
-  /* Constrains the width and applies your dark theme */
   .admin-card {
     background-color: #2D2D2D; 
     color: #FFFFFF;
@@ -104,89 +113,173 @@
 
 @code
 {
+
+  /*
+    AddApplication Razor Logic
+    Code that detemines all logic for the Add Application popup menu
+    Includes the following:
+      - Parameter Variables
+        - bool IsVisible
+        - EventCallback OnClose
+        - EventCallback OnApplicationAdded
+      - Panel Variables
+        - AppModel appModel
+        - string errorMessage
+        - bool isSaving
+        - List<NewRelicApp> newRelicOptions
+        - List<NagiosApp> nagiosOptions
+      - Methods
+        - OnInitializedAsync()
+        - GetAppJiraWorkspacesAsync(int)
+  */
+
+  //Parameter variables
+  //These are all pulled from other pages (in this case Navbar.razor)
+
+  //Boolean parameter to determine when the panel should be visible
+  //Changes on "add app" button click
   [Parameter] public bool IsVisible { get; set; }
+
+  //Event Parameter for when the panel is closed
   [Parameter] public EventCallback OnClose { get; set; }
 
+  //Event Parameter for when an app is added
   [Parameter] public EventCallback OnApplicationAdded { get; set; }
 
+
+  //Panel Variables
+  //Variables that are all only used for admin panel purposes
+
+  //App model initialized to save admin's configuration
   private AppModel appModel = new();
+
+  //String to show potential error message if saving config fails
   private string errorMessage = "";
+
+  //Boolean to track when saving has started and ended
+  //Primarily to show user that their action has a response even when loading slowly
   private bool isSaving = false;
 
+  //List of New Relic and Nagios apps to show all currently available apps for configuration
   private List<NewRelicApp> newRelicOptions = new();
   private List<NagiosApp> nagiosOptions = new();
   
+
+  //Methods
+  
+  /*
+    Brady Brown
+    OnInitializedAsync Method
+    Method for initial boot of page
+    Searches for currently used New Relic and Nagios connections
+    Compares these with all apps, and only displays currently available connections
+  */
   protected override async Task OnInitializedAsync()
   {
+    //Lists for currently used ints
     List<int> usedNewRelicIds = new List<int>();
     List<int> usedNagiosIds = new List<int>();
 
     try
     {
+      //Uses AppCreation method to find all apps currently used in Monarch DB
       usedNewRelicIds = await AppCreationService.GetUsedNewRelicIdsAsync();
       usedNagiosIds = await AppCreationService.GetUsedNagiosIdsAsync();
     }
     catch (Exception ex)
     {
+      //Throws error if connection to DB fails
       Console.WriteLine($"Error checking used IDs: {ex.Message}");
     }
     try
     {
+      //Uses AppCreation method to find all New Relic apps being monitored in Monapi DB
       var allNr = await AppCreationService.GetAvailableNewRelicAppsAsync();
+      //Creates list of all New Relic apps that are not in the used New Relic Ids list
       newRelicOptions = allNr.Where(opt => !usedNewRelicIds.Contains(opt.AppId)).ToList();
     }
     catch (Exception ex)
     {
+      //Throws error if connection to Monapi DB fails
       Console.WriteLine($"Error loading New Relic apps: {ex.Message}");
     }
 
     try
     {
+      //Uses AppCreation method to find all Nagios apps being monitored in Monapi DB
       var allN = await AppCreationService.GetAvailableNagiosAppsAsync();
+      //Creates list of all Nagios apps that are not in the used Nagios Ids list
       nagiosOptions = allN.Where(opt => !usedNagiosIds.Contains(opt.AppId)).ToList();
     }
     catch (Exception ex)
     {
+      //Throws error if connection to Monapi DB fails
       Console.WriteLine($"Error loading Nagios apps: {ex.Message}");
     }
   }
 
+  /*
+    Brady Brown
+    Close Method
+    Method for closing the panel
+    Calls back to method in NavBar
+    Is called when cancel button is clicked, exit button is clicked, or outside of panel is clicked
+  */
   private async Task Close()
   {
     await OnClose.InvokeAsync();
   }
 
+  /*
+    Brady Brown
+    HandleSubmit Method
+    Method for what to do when Add App panel form is submitted
+    Is called when submit button is clicked
+  */
   private async Task HandleSubmit()
   {
+    //Checks to see if the current app model has a name
+    //Form directly edits a blank app model, so it checks the model itself and not the form space
     if (string.IsNullOrWhiteSpace(appModel.AppName))
     {
+      //If no name is selected, an error stating a name is required appears
       errorMessage = "Application name is required.";
       return;
     }
 
+    //Once form is correct, saving process is started
     isSaving = true;
+    //Error message is set to nothing, to remove if an error message was previously visible
     errorMessage = "";
 
     try
     {
+      //Calls AppCreation service to create an app with the form model
+      //App model is directly put into Monarch DB
       await AppCreationService.CreateMonarchAppAsync(appModel);
 
+      //App model is returned to blank
       appModel = new();
 
+      //Checks to make sure there is a method for when an application is added in dashboard
       if (OnApplicationAdded.HasDelegate)
       {
+        //Calls said method to ensure dashboard is properly updated after applicaiton addition
         await OnApplicationAdded.InvokeAsync();
       }
 
+      //After all is done, panel is closed
       await Close();
     }
     catch (Exception ex)
     {
+      //If connection to DB fails, error message for user and backend appears
       errorMessage = $"Failed to save application: {ex.Message}";
       Console.WriteLine($"Error saving app: {ex.Message}");
     }
     finally
     {
+      //Whether saving works or not, saving state is now over
       isSaving = false;
     }
   }
