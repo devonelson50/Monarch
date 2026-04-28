@@ -67,6 +67,12 @@ BEGIN
 END
 GO
 
+IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'monapi')
+BEGIN
+    DROP USER monapi;
+END
+GO
+
 USE monapi;
 IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'monarch')
 BEGIN
@@ -128,6 +134,7 @@ CREATE USER monapi FOR LOGIN monapi;
 ALTER ROLE db_datareader ADD MEMBER monapi;
 ALTER ROLE db_datawriter ADD MEMBER monapi;
 ALTER ROLE db_datareader ADD MEMBER monarch;
+GO
 
 -- Create monapi tables 
 
